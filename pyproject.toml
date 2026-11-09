@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grounded-mlops-agent"
+version = "0.1.0"
+description = "AI agent that answers ML operations questions using evidence from live DVC, MLflow, Airflow and Kubernetes systems."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "dvc==3.67.1",
+    "fastapi==0.162.2",
+    "httpx==0.28.1",
+    "joblib==1.6.0",
+    "kubernetes==37.0.1",
+    "mlflow==3.18.0",
+    "pandas==3.1.1",
+    "pydantic==2.14.3",
+    "scikit-learn==1.9.1",
+    "uvicorn==0.54.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "ruff==0.17.4",
+]
+
+[tool.setuptools]
+packages = []
