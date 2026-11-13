@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "grounded-mlops-agent"
 version = "0.1.0"
-description = "AI agent that answers ML operations questions using evidence from live DVC, MLflow, Airflow and Kubernetes systems."
+description = "Conversational AI agent for MLOps: traces dataset lineage (DVC), compares experiments (MLflow), runs training pipelines (Airflow) and diagnoses Kubernetes deployments, backing every answer with real tool evidence."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
