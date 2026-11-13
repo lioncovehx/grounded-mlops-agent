@@ -1,0 +1,18 @@
+schema: '2.0'
+stages:
+  preprocess:
+    cmd: python training/train.py preprocess
+    deps:
+    - path: data/raw/wine.csv
+      hash: md5
+      md5: 3e3353d229ccbf42237c408206d69423
+      size: 379241
+    - path: training/train.py
+      hash: md5
+      md5: b4f745a131dbce1d2d892b88a541741d
+      size: 6670
+    outs:
+    - path: data/processed/wine.csv
+      hash: md5
+      md5: 8eb6bb7faa748d44dbdcc9506dfaeb24
+      size: 310264

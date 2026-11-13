@@ -1,0 +1,8 @@
+stages:
+  preprocess:
+    cmd: python training/train.py preprocess
+    deps:
+      - data/raw/wine.csv
+      - training/train.py
+    outs:
+      - data/processed/wine.csv
