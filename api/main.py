@@ -1,5 +1,6 @@
 """Inference service for the wine quality model."""
 
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -59,8 +60,20 @@ class Wine(BaseModel):
 def predict(wine: Wine) -> dict:
     if "model" not in state:
         raise HTTPException(503, "model not loaded")
-    good = state["model"].predict(pd.DataFrame([wine.model_dump()]))[0]
-    return {"good_quality": bool(good), "model_version": MODEL_VERSION}
+    features = wine.model_dump()
+    good = bool(state["model"].predict(pd.DataFrame([features]))[0])
+    # One JSON line per prediction: the input record used for drift monitoring.
+    log.info(
+        json.dumps(
+            {
+                "event": "prediction",
+                "model_version": MODEL_VERSION,
+                "good_quality": good,
+                "features": features,
+            }
+        )
+    )
+    return {"good_quality": good, "model_version": MODEL_VERSION}
 
 
 @app.get("/health/live")

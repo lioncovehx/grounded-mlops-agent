@@ -186,3 +186,63 @@ def test_stuck_rollout_is_not_reported_complete(fake_k8s):
     )
     result = execute_tool("get_deployed_version", {}, "t12")
     assert result["data"]["rollout_complete"] is False
+
+
+def _prediction_log(rows, sugar):
+    lines = ['INFO:     10.244.0.1:5555 - "GET /health/ready HTTP/1.1" 200 OK']
+    for i in range(rows):
+        features = {"alcohol": 10.0 + (i % 5) * 0.1, "residual_sugar": sugar + (i % 3)}
+        event = {"event": "prediction", "model_version": "4", "good_quality": i % 5 == 0}
+        lines.append("INFO:wine-api:" + json.dumps({**event, "features": features}))
+    return "\n".join(lines)
+
+
+@pytest.fixture
+def drift_setup(monkeypatch):
+    import pandas as pd
+
+    from agent.tools import monitoring_tools
+
+    base = pd.DataFrame(
+        {
+            "alcohol": [9.5, 10.0, 10.5, 11.0] * 25,
+            "residual_sugar": [2.0, 4.0, 6.0, 8.0] * 25,
+            "good": [0, 0, 0, 1] * 25,
+        }
+    )
+    tags = {"data.tag": "data-v2", "data.commit": "c2"}
+    monkeypatch.setattr(monitoring_tools, "champion_baseline", lambda: ("4", tags, base))
+    core = MagicMock()
+    pod = SimpleNamespace(metadata=SimpleNamespace(name="wine-api-1"))
+    core.list_namespaced_pod.return_value = SimpleNamespace(items=[pod])
+    monkeypatch.setattr(kubernetes_tools, "clients", lambda: (core, MagicMock()))
+    return core
+
+
+def test_drift_is_flagged_when_live_inputs_shift(drift_setup):
+    drift_setup.read_namespaced_pod_log.return_value = _prediction_log(40, sugar=20.0)
+    data = execute_tool("check_prediction_drift", {}, "t13")["data"]
+    assert data["predictions_found"] == 40
+    assert data["drift_detected"] is True
+    assert data["drifted_features"] == ["residual_sugar"]
+    assert data["baseline"]["data_tag"] == "data-v2"
+
+
+def test_no_drift_when_live_inputs_match_training(drift_setup):
+    drift_setup.read_namespaced_pod_log.return_value = _prediction_log(40, sugar=4.0)
+    data = execute_tool("check_prediction_drift", {}, "t14")["data"]
+    assert data["drift_detected"] is False
+    assert data["drifted_features"] == []
+
+
+def test_too_few_predictions_gives_no_verdict(drift_setup):
+    drift_setup.read_namespaced_pod_log.return_value = _prediction_log(5, sugar=20.0)
+    data = execute_tool("check_prediction_drift", {}, "t15")["data"]
+    assert data["drift_detected"] is None
+    assert "need at least" in data["finding"]
+
+
+def test_drift_check_refuses_other_namespaces(drift_setup):
+    result = execute_tool("check_prediction_drift", {"namespace": "kube-system"}, "t16")
+    assert result["status"] == "error"
+    drift_setup.list_namespaced_pod.assert_not_called()

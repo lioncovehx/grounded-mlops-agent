@@ -68,7 +68,7 @@ sequenceDiagram
 
     U->>A: POST /chat {message}
     loop up to 10 steps
-        A->>L: system prompt + conversation + 24 tool schemas
+        A->>L: system prompt + conversation + 25 tool schemas
         L-->>A: tool_calls
         A->>X: name, args, request_id
         X->>X: validate args (Pydantic)
@@ -126,3 +126,17 @@ flowchart LR
 | Command allowlist | `dvc_tools.run` | Only `git show/rev-parse/tag/status/log` and `dvc list/diff/status`, without a shell. Revisions must match `^[\w./-]+$` and can't start with `-` |
 | Argument validation | Pydantic models | Unknown fields rejected; ranges and patterns enforced |
 | Kubernetes RBAC | `kubernetes/rbac.yaml` | Get and list on Pods, logs, Services and Events; patch on Deployments; namespace `mlops-app` only. No delete, no secrets |
+
+## Drift monitoring
+
+```mermaid
+flowchart LR
+    C["Client"] -- "POST /predict" --> I["wine-api Pods"]
+    I -- "one JSON line per prediction" --> L["Pod logs"]
+    T["check_prediction_drift"] -- "pods/log (agent token)" --> L
+    T -- "champion → source run → data.commit" --> M["MLflow"]
+    T -- "dvc.api.read at data.commit" --> D["DVC cache:<br/>exact training data"]
+    T --> R["per-feature mean shift in training std,<br/>live vs training 'good' rate"]
+```
+
+The baseline is the exact dataset the deployed model was trained on, located through the same provenance chain as `get_dataset_for_run`. A feature counts as drifted when its live mean moves more than 0.5 training standard deviations. Fewer than 30 logged predictions gives no verdict. This measures input drift only: accuracy in production needs true quality labels, which the system doesn't receive.

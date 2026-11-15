@@ -45,7 +45,7 @@ flowchart LR
 | Airflow pipeline | `dags/training_pipeline.py`, `infra/airflow/Dockerfile` |
 | Inference service | `api/main.py`, `Dockerfile` |
 | Kubernetes manifests and RBAC | `kubernetes/` |
-| Tools: 24 across four systems | `agent/tools/` |
+| Tools: 25, across DVC, MLflow, Airflow, Kubernetes and drift monitoring | `agent/tools/` |
 | Tool runner: validation, confirmation, timeouts, structured logs | `agent/registry.py` |
 | Agent loop and system prompt | `agent/orchestrator.py` |
 | LLM adapter | `agent/llm.py` |
@@ -175,6 +175,18 @@ curl -s -X POST localhost:8001/actions/<pending_action_id>/cancel         # disc
 
 Pending actions expire after 5 minutes.
 
+## Monitoring for drift
+
+The inference service writes one JSON line per prediction to its logs. The agent's `check_prediction_drift` tool reads them from the Pods and compares the inputs with the exact data the deployed model was trained on. It finds that data through the champion's provenance tags and reads it from the DVC cache. It reports each feature's mean shift in training standard deviations, flags shifts over 0.5, and needs at least 30 predictions before giving a verdict.
+
+To try it, port-forward the Service, send traffic, then ask the agent:
+
+```bash
+kubectl -n mlops-app port-forward svc/wine-api 8000:80 &
+python scripts/send_traffic.py normal --n 60    # real rows: no drift
+python scripts/send_traffic.py skewed --n 60    # residual sugar tripled: drift
+```
+
 ## Using your own LLM
 
 The agent speaks the OpenAI chat-completions format, which llama.cpp, vLLM, Ollama, OpenAI and many hosted providers support. Change only these three settings:
@@ -225,5 +237,5 @@ The model predicts whether a wine is good (quality 7 or above), with duplicates 
 - **One train/test split** and a small dataset. The F1 scores are indicative, not tuned.
 - **Pending actions are in memory.** They're lost on restart and work only with a single process.
 - **Short-lived Kubernetes token.** It has to be recreated when it expires.
-- **No production metrics.** The agent can't judge degradation in live traffic, and says so.
+- **No live accuracy.** Input drift is measured from prediction logs, but accuracy in production needs true quality labels, which the system doesn't receive. Prediction logs also reset when Pods restart.
 - **LLM judgement varies.** Facts come from tools, and code adds a note when a tool fails, but which tools the model chooses, and its inferences, can still vary between runs.

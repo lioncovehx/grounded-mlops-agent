@@ -168,4 +168,5 @@ from agent.tools import (  # noqa: F401
     dvc_tools,
     kubernetes_tools,
     mlflow_tools,
+    monitoring_tools,
 )

@@ -1,17 +1,17 @@
 $ kubectl -n mlops-app get deploy,pods,svc,configmap -o wide
 NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES           SELECTOR
-deployment.apps/wine-api   2/2     2            2           27m   wine-api     wine-api:0.1.0   app=wine-api
+deployment.apps/wine-api   2/2     2            2           59m   wine-api     wine-api:0.1.1   app=wine-api
 
-NAME                            READY   STATUS    RESTARTS   AGE     IP           NODE    NOMINATED NODE   READINESS GATES
-pod/wine-api-66dc547b48-pndtn   1/1     Running   0          5m42s   10.244.0.6   mlops   <none>           <none>
-pod/wine-api-66dc547b48-sf4xq   1/1     Running   0          5m47s   10.244.0.5   mlops   <none>           <none>
+NAME                            READY   STATUS    RESTARTS   AGE    IP           NODE    NOMINATED NODE   READINESS GATES
+pod/wine-api-6d58fd769f-gb6tk   1/1     Running   0          2m5s   10.244.0.8   mlops   <none>           <none>
+pod/wine-api-6d58fd769f-j2p9d   1/1     Running   0          2m     10.244.0.9   mlops   <none>           <none>
 
 NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
-service/wine-api   ClusterIP   10.99.26.167   <none>        80/TCP    27m   app=wine-api
+service/wine-api   ClusterIP   10.99.26.167   <none>        80/TCP    59m   app=wine-api
 
 NAME                         DATA   AGE
-configmap/kube-root-ca.crt   1      27m
-configmap/wine-api-config    1      27m
+configmap/kube-root-ca.crt   1      59m
+configmap/wine-api-config    1      59m
 
 $ kubectl -n mlops-app rollout history deployment/wine-api
 deployment.apps/wine-api 
@@ -19,6 +19,7 @@ REVISION  CHANGE-CAUSE
 1         <none>
 3         <none>
 4         <none>
+5         <none>
 
 
 # agent ServiceAccount permissions

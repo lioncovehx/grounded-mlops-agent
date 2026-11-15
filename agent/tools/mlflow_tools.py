@@ -215,5 +215,6 @@ def get_retraining_signals(args: ModelArgs) -> dict:
         "too_old": age_days > max_age_days,
         "quality_gate": run.data.tags.get("quality_gate"),
         "f1": run.data.metrics.get("f1"),
-        "degradation_evidence": "none supplied; only the user can provide production metrics",
+        "degradation_evidence": "not checked here: call check_prediction_drift for input drift; "
+        "live accuracy needs true labels, which the system does not have",
     }
