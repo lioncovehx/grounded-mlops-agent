@@ -45,7 +45,7 @@ flowchart LR
 | Component | Location |
 |---|---|
 | Project config | `mlops-agent.yaml`, loaded by `agent/config.py` |
-| Tools: 25 across DVC, MLflow, Airflow, Kubernetes and drift monitoring | `agent/tools/` |
+| Tools: 26 across DVC, MLflow, Airflow, Kubernetes and drift monitoring | `agent/tools/` |
 | Tool runner: validation, confirmation, timeouts, structured logs | `agent/registry.py` |
 | Agent loop and system prompt | `agent/orchestrator.py` |
 | LLM adapter | `agent/llm.py` |
@@ -199,7 +199,7 @@ curl -s localhost:8001/chat -H 'Content-Type: application/json' \
 
 Send earlier turns as `"history": [{"role": "user" | "assistant", "content": "..."}]` (up to 10) for follow-up questions. Every response has `answer`, `evidence` (one envelope per tool call: `tool`, `status`, `data`, `error`, `duration_ms`, `request_id`), `request_id`, and `pending_action_id`.
 
-**Confirming changes.** Restarting a deployment and triggering a pipeline never run straight from a chat. The response carries a `pending_action_id` instead:
+**Confirming changes.** Restarting a deployment, triggering a pipeline and promoting a model never run straight from a chat. The response carries a `pending_action_id` instead:
 
 ```bash
 curl -s -X POST localhost:8001/actions/<pending_action_id>/confirm | jq   # runs it, once
@@ -271,5 +271,5 @@ The model predicts whether a wine is good (quality 7 or above), with duplicates 
 - **Pending actions are in memory.** They're lost on restart and work only with a single process.
 - **Short-lived Kubernetes token.** It has to be recreated when it expires.
 - **No live accuracy.** Input drift is measured from prediction logs, but accuracy in production needs true labels, which the system doesn't receive. Prediction logs also reset when Pods restart.
-- **No promotion tool.** The agent reports `candidate` and `champion` but can't move them; promotion and deployment are manual (step 3).
+- **Promotion doesn't redeploy.** `promote_model` moves `champion` (after confirmation, and only to a version whose gate passed), but serving that version still means building and deploying its image (step 3). The agent compares the two and says when they differ.
 - **LLM judgement varies.** Facts come from tools, and code adds a note when a tool fails, but which tools the model chooses, and its inferences, can still be wrong. See the report's "Agent errors observed".

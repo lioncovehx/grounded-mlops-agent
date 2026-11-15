@@ -261,3 +261,34 @@ def get_retraining_signals(args: ModelArgs) -> dict:
         "degradation_evidence": "not checked here: call check_prediction_drift for input drift; "
         "live accuracy needs true labels, which the system does not have",
     }
+
+
+class PromoteArgs(Args):
+    version: str = Field(pattern=r"^\d+$", description="Registry version to promote, e.g. 7")
+    model: str | None = Model
+
+
+@tool(PromoteArgs, mutates=True)
+def promote_model(args: PromoteArgs) -> dict:
+    """Move the deployed alias (champion) to a registry version. Only versions whose run passed
+    the quality gate and has data provenance. Does not redeploy the running service."""
+    cfg = settings().mlflow
+    name = model_name(args.model)
+    c = client()
+    version = c.get_model_version(name, args.version)
+    recorded = provenance(c.get_run(source_run_id(version)).data.tags)
+    if recorded.get("quality_gate") != "passed":
+        raise PermissionError(f"version {args.version} did not pass the quality gate")
+    if "data_hash" not in recorded:
+        raise PermissionError(f"version {args.version} has no data provenance")
+    previous = deployed_version(name)
+    c.set_registered_model_alias(name, cfg.aliases.deployed, args.version)
+    return {
+        "model": name,
+        "alias": cfg.aliases.deployed,
+        "version": args.version,
+        "previous_version": previous.version if previous else None,
+        "data_version": recorded.get("data_version"),
+        "note": "registry updated only. The service keeps its current model: a restart does not change "
+        "it; serving this version needs a new image built and deployed (manual step)",
+    }

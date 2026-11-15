@@ -1,0 +1,22 @@
+{
+  "request_id": "06545f3f7ace",
+  "answer": "Confirmed promote_model: done.",
+  "evidence": [
+    {
+      "tool": "promote_model",
+      "status": "ok",
+      "data": {
+        "model": "wine-quality",
+        "alias": "champion",
+        "version": "6",
+        "previous_version": "3",
+        "data_version": "data-v2",
+        "note": "registry updated only. The service keeps its current model: a restart does not change it; serving this version needs a new image built and deployed (manual step)"
+      },
+      "error": null,
+      "duration_ms": 179,
+      "request_id": "06545f3f7ace"
+    }
+  ],
+  "pending_action_id": null
+}

@@ -1,0 +1,161 @@
+{
+  "request_id": "e855f9f1bb68",
+  "answer": "## Known facts\n- **Deployed service** (`get_deployed_version`): `wine-quality-api` is running image `wine-quality-api:model-v6`, model version **6**, rollout complete — 2/2 replicas ready, 0 unavailable.\n- **Registry champion** (`get_registry_info`): the `champion` alias points to version **3** (f1 ≈ 0.4951), while version 6 is a plain version with no aliases (f1 ≈ 0.4920).\n\n## Uncertainties\n- Nothing uncertain about the two facts above. Whether production traffic actually routes to the `champion` alias vs. whatever image the Deployment runs is not separately confirmed — but Deployments serve by image, and the image is v6.\n\n## Recommended actions\nNo — **the deployed service is not serving the champion model.** It is serving **v6**, while the registry's `champion` alias currently points to **v3**.\n\n- v6 (deployed) has a lower f1 (0.4920) than the champion v3 (0.4951), and v6 carries no aliases — so it is not the champion.\n- Note: v6 is itself a valid, gate-passing version on `data-v2`, but \"deployed\" ≠ \"champion\" right now.\n\nIf you want the deployed service to serve the champion, that would require promoting v3 (it already holds the `champion` alias) and then rolling the deployment back to v3 — but I won't take any of those actions unless you explicitly ask.",
+  "evidence": [
+    {
+      "tool": "get_deployed_version",
+      "status": "ok",
+      "data": {
+        "name": "wine-quality-api",
+        "desired": 2,
+        "ready": 2,
+        "available": 2,
+        "updated": 2,
+        "unavailable": 0,
+        "images": [
+          "wine-quality-api:model-v6"
+        ],
+        "model_version": "6",
+        "rollout_complete": true
+      },
+      "error": null,
+      "duration_ms": 299,
+      "request_id": "e855f9f1bb68"
+    },
+    {
+      "tool": "get_registry_info",
+      "status": "ok",
+      "data": {
+        "model": "wine-quality",
+        "aliases": {
+          "candidate": "7",
+          "champion": "3"
+        },
+        "versions": [
+          {
+            "version": "7",
+            "aliases": [
+              "candidate"
+            ],
+            "source_run": "8802379c1b7b4154ba49a52ff253cd47",
+            "created": "2026-11-15T17:44:46.777000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "data_path": "data/raw/wine.csv",
+              "code_commit": "d5d1f9d2cb2bb89d58efcdd899409b9cdefec3d3",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "6",
+            "aliases": [],
+            "source_run": "c52f21d3155f488ab33b38dc860ca0ea",
+            "created": "2026-11-15T17:38:28.433000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "data_path": "data/raw/wine.csv",
+              "code_commit": "1837884fb5b0d73b498751ea77cb4c2cce6a1cd9",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "5",
+            "aliases": [],
+            "source_run": "4113ba5e5b8d4e8abae243983bf7b480",
+            "created": "2026-11-15T16:42:27.649000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "941754ebd5510bad68a77bf30efa603222c72a29",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "4",
+            "aliases": [],
+            "source_run": "80655548427547dc83498398d8af75ee",
+            "created": "2026-11-15T16:03:55.070000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "3",
+            "aliases": [
+              "champion"
+            ],
+            "source_run": "dd037273c28649d6a6b917bdfd2ebc12",
+            "created": "2026-11-13T17:05:43.671000+00:00",
+            "metrics": {
+              "f1": 0.495114006514658
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "2",
+            "aliases": [],
+            "source_run": "9e7b5702d75e4e979ef79556ea5c7902",
+            "created": "2026-11-13T17:05:33.248000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "1",
+            "aliases": [],
+            "source_run": "8da2c720fcb24105a074a300bf94a90b",
+            "created": "2026-11-13T17:05:14.224000+00:00",
+            "metrics": {
+              "f1": 0.4727272727272727
+            },
+            "provenance": {
+              "data_hash": "7d814a1bda02145efe703f4e1c01847a",
+              "data_version": "data-v1",
+              "data_commit": "f4f2bf155225a4944f10806db16880a4d8c7d706",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
+          }
+        ]
+      },
+      "error": null,
+      "duration_ms": 543,
+      "request_id": "e855f9f1bb68"
+    }
+  ],
+  "pending_action_id": null
+}

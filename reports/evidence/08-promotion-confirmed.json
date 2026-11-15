@@ -1,0 +1,22 @@
+{
+  "request_id": "6c34306bbcae",
+  "answer": "Confirmed promote_model: done.",
+  "evidence": [
+    {
+      "tool": "promote_model",
+      "status": "ok",
+      "data": {
+        "model": "wine-quality",
+        "alias": "champion",
+        "version": "3",
+        "previous_version": "6",
+        "data_version": "data-v2",
+        "note": "registry updated only; the running deployment is unchanged until it is redeployed"
+      },
+      "error": null,
+      "duration_ms": 162,
+      "request_id": "6c34306bbcae"
+    }
+  ],
+  "pending_action_id": null
+}

@@ -73,7 +73,7 @@ sequenceDiagram
 
     U->>A: POST /chat {message}
     loop up to 10 steps
-        A->>L: system prompt + conversation + 25 tool schemas
+        A->>L: system prompt + conversation + 26 tool schemas
         L-->>A: tool_calls
         A->>X: name, args, request_id
         X->>X: validate args (Pydantic)
@@ -127,7 +127,8 @@ flowchart LR
 
 | Layer | Enforced by | Limit |
 |---|---|---|
-| Confirmation | `execute_tool` and `/actions/{id}/confirm` | `restart_deployment` and `trigger_dag` run only after a person confirms them, once. The LLM has no tool that confirms |
+| Confirmation | `execute_tool` and `/actions/{id}/confirm` | `restart_deployment`, `trigger_dag` and `promote_model` run only after a person confirms them, once. The LLM has no tool that confirms |
+| Quality gate | `promote_model` | Refuses any version whose run didn't pass the gate or lacks data provenance |
 | Allowlists | The tool functions, from `mlops-agent.yaml` | Kubernetes tools: `kubernetes.namespace` only. `trigger_dag`: `airflow.allowed_dags` only |
 | Command allowlist | `dvc_tools.run` | Only `git show/rev-parse/tag/status/log/ls-files` and `dvc diff/status`, without a shell. Revisions must match `^[\w./-]+$` and can't start with `-`; dataset paths must be tracked `.dvc` files |
 | Argument validation | Pydantic models | Unknown fields rejected; ranges and patterns enforced |

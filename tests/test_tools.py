@@ -306,3 +306,32 @@ def test_drift_check_skips_pods_without_logs(drift_setup):
     assert result["status"] == "ok"
     assert result["data"]["pods_read"] == ["test-api-1"]
     assert "test-api-2" in result["data"]["pods_skipped"]
+
+
+def _version(run_id="r" * 32):
+    return SimpleNamespace(version="7", tags={"source_run": run_id}, run_id=run_id)
+
+
+def test_promote_refuses_a_version_that_failed_the_gate(fake_mlflow):
+    fake_mlflow.get_model_version.return_value = _version()
+    fake_mlflow.get_run.return_value = make_run("r" * 32, f1=0.41, gate="failed")
+    result = execute_tool("promote_model", {"version": "7"}, "t20", confirmed=True)
+    assert result["status"] == "error"
+    assert "did not pass the quality gate" in result["error"]
+    fake_mlflow.set_registered_model_alias.assert_not_called()
+
+
+def test_promote_without_confirmation_does_nothing(fake_mlflow):
+    result = execute_tool("promote_model", {"version": "7"}, "t21")
+    assert result["status"] == "confirmation_required"
+    fake_mlflow.set_registered_model_alias.assert_not_called()
+
+
+def test_confirmed_promotion_moves_the_deployed_alias(fake_mlflow):
+    fake_mlflow.get_model_version.return_value = _version()
+    fake_mlflow.get_run.return_value = make_run("r" * 32, f1=0.49, gate="passed")
+    fake_mlflow.get_model_version_by_alias.return_value = SimpleNamespace(version="6")
+    result = execute_tool("promote_model", {"version": "7"}, "t22", confirmed=True)
+    assert result["status"] == "ok"
+    assert result["data"]["previous_version"] == "6"
+    fake_mlflow.set_registered_model_alias.assert_called_once_with("test-model", "champion", "7")
