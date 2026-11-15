@@ -62,7 +62,9 @@ def services(monkeypatch):
                 spec=SimpleNamespace(containers=[SimpleNamespace(image="wine-api:0.1.0")]),
             ),
         ),
-        status=SimpleNamespace(ready_replicas=2, available_replicas=2),
+        status=SimpleNamespace(
+            ready_replicas=2, available_replicas=2, updated_replicas=2, unavailable_replicas=0
+        ),
     )
     core, apps = MagicMock(), MagicMock()
     apps.read_namespaced_deployment.return_value = deployment

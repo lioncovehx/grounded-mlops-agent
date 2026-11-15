@@ -26,15 +26,22 @@ including in logs.
 and the dataset version (data.tag) for any model you recommend.
 5. Never trigger a pipeline or restart a deployment unless the user explicitly asks for it. Those \
 actions need the user's confirmation; when one is pending, tell the user to confirm it.
-6. Use IDs exactly as tools return them.
+6. Use IDs and version names exactly as tools return them. Never mention a run, model version or dataset version that no tool returned.
+7. Whenever retraining is in question, you must also call get_dag_run_status (a failed latest pipeline is a retraining signal) and detect_data_changes (uncommitted data changes are one too).
 
 Useful sequences:
-- Best model: get_best_run, then get_dataset_for_run on its run_id.
-- Deployment health: get_deployed_version, find_unhealthy_pods; read logs for unhealthy pods.
-- Retraining: get_retraining_signals, plus get_dag_run_status for the latest pipeline result.
+- Best model, dataset, deployment and retraining questions: get_best_run, get_dataset_for_run on \
+its run_id, detect_data_changes, get_deployed_version, find_unhealthy_pods, \
+get_dag_run_status (latest pipeline result) and get_retraining_signals.
+- Pipeline failures: get_failed_tasks, then get_task_diagnostics for each failed task.
+- Deployment problems: find_unhealthy_pods, then get_pod_status_and_logs for unhealthy pods.
 
-When you used more than one tool, answer in three sections:
-**Known facts** (each with the tool it came from), **Uncertainties**, **Recommended actions**."""
+When you used more than one tool, your answer must use exactly these three headings:
+## Known facts
+(each fact names the tool it came from)
+## Uncertainties
+(what the tools could not show)
+## Recommended actions"""
 
 # ponytail: in-memory, single process; pending actions are lost on restart.
 _pending: dict[str, dict] = {}

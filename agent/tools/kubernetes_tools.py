@@ -79,6 +79,8 @@ def deployment_summary(d) -> dict:
         "desired": d.spec.replicas,
         "ready": d.status.ready_replicas or 0,
         "available": d.status.available_replicas or 0,
+        "updated": d.status.updated_replicas or 0,
+        "unavailable": d.status.unavailable_replicas or 0,
         "images": [c.image for c in d.spec.template.spec.containers],
         "model_version": (d.spec.template.metadata.labels or {}).get("model-version"),
     }
@@ -183,7 +185,12 @@ def get_deployed_version(args: DeploymentArgs) -> dict:
     _, apps = clients()
     d = apps.read_namespaced_deployment(args.name, ns, _request_timeout=REQUEST_TIMEOUT)
     summary = deployment_summary(d)
-    summary["rollout_complete"] = summary["available"] == summary["desired"]
+    # Complete only when every replica runs the current spec: during a stuck rollout the old
+    # Pods are still available, so comparing available with desired alone is misleading.
+    summary["rollout_complete"] = (
+        summary["updated"] == summary["desired"] == summary["available"]
+        and summary["unavailable"] == 0
+    )
     return summary
 
 

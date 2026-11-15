@@ -166,3 +166,23 @@ def test_log_record_has_fixed_fields_and_no_arguments(caplog, fake_mlflow):
         }
     ]
     assert secret not in caplog.text
+
+
+def test_stuck_rollout_is_not_reported_complete(fake_k8s):
+    # Seen live: a bad image tag left the old Pods available while the new one could not pull.
+    _, apps = fake_k8s
+    apps.read_namespaced_deployment.return_value = SimpleNamespace(
+        metadata=SimpleNamespace(name="wine-api"),
+        spec=SimpleNamespace(
+            replicas=2,
+            template=SimpleNamespace(
+                metadata=SimpleNamespace(labels={}),
+                spec=SimpleNamespace(containers=[SimpleNamespace(image="wine-api:0.2.0")]),
+            ),
+        ),
+        status=SimpleNamespace(
+            ready_replicas=2, available_replicas=2, updated_replicas=1, unavailable_replicas=1
+        ),
+    )
+    result = execute_tool("get_deployed_version", {}, "t12")
+    assert result["data"]["rollout_complete"] is False
