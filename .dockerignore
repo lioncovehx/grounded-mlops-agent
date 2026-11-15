@@ -1,0 +1,6 @@
+# Inference image: only what it needs
+*
+!requirements-api.txt
+!api/
+!model/
+api/__pycache__/

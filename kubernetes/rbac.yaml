@@ -1,0 +1,34 @@
+# Restricted identity for the agent: read-only in mlops-app, plus patching
+# Deployments (used for rollout restarts). No delete, nothing outside the namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent
+  namespace: mlops-app
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-role
+  namespace: mlops-app
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "events"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-binding
+  namespace: mlops-app
+subjects:
+  - kind: ServiceAccount
+    name: agent
+    namespace: mlops-app
+roleRef:
+  kind: Role
+  name: agent-role
+  apiGroup: rbac.authorization.k8s.io

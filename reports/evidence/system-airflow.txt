@@ -1,0 +1,25 @@
+# Airflow training_pipeline runs (via REST API)
+manual__2026-11-15T16:03:39.440602+00:00  success
+    validate_dataset: success (try 1)
+    preprocess: success (try 1)
+    train: success (try 1)
+    evaluate_and_log: success (try 1)
+    quality_gate: success (try 1)
+manual__2026-11-15T16:05:00.858775+00:00  failed
+    validate_dataset: success (try 1)
+    preprocess: success (try 1)
+    train: success (try 1)
+    evaluate_and_log: success (try 1)
+    quality_gate: failed (try 1)
+manual__2026-11-15T16:06:22.809346+00:00  failed
+    validate_dataset: failed (try 1)
+    preprocess: upstream_failed (try 0)
+    train: upstream_failed (try 0)
+    evaluate_and_log: upstream_failed (try 0)
+    quality_gate: upstream_failed (try 0)
+manual__2026-11-15T16:42:13.517323+00:00  success
+    validate_dataset: success (try 1)
+    preprocess: success (try 1)
+    train: success (try 1)
+    evaluate_and_log: success (try 1)
+    quality_gate: success (try 1)

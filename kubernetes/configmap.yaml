@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wine-api-config
+  namespace: mlops-app
+data:
+  LOG_LEVEL: "INFO"

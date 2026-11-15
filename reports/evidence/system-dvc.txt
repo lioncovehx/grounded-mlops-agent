@@ -1,0 +1,12 @@
+$ dvc diff data-v1 data-v2
+Modified:
+    data/raw/wine.csv
+
+files summary: 1 modified
+
+$ dvc status
+Data and pipelines are up to date.
+
+$ git tag -l "data-*" -n1
+data-v1         data: add red wine dataset
+data-v2         data: add white wine samples
