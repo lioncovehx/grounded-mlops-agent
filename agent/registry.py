@@ -1,9 +1,4 @@
-"""Tool registry and the single entry point that runs a tool safely.
-
-Every tool call goes through execute_tool, which validates arguments, enforces
-confirmation for tools that change things, applies a timeout, and always returns
-the same envelope instead of raising.
-"""
+"""Tool registry and execute_tool: validation, confirmation, timeout, one envelope, no raise."""
 
 import json
 import logging

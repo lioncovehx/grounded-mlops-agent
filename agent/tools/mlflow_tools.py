@@ -1,21 +1,21 @@
-"""MLflow tools: experiments, runs, the model registry and run-to-data lineage, read-only."""
+"""MLflow tools: experiments, runs, the model registry and run-to-data lineage, read-only.
+
+Experiment, model, metric, alias and provenance tag names come from the project config, and
+every one can also be passed as an argument, so the tools work on any MLflow server.
+"""
 
 import os
 from datetime import UTC, datetime
 
 from pydantic import Field
 
+from agent.config import required, settings
 from agent.registry import Args, NoArgs, tool
 from agent.tools import dvc_tools
 
 # Fail fast when MLflow is down instead of retrying for minutes.
 os.environ.setdefault("MLFLOW_HTTP_REQUEST_MAX_RETRIES", "0")
 os.environ.setdefault("MLFLOW_HTTP_REQUEST_TIMEOUT", "10")
-
-DEFAULT_EXPERIMENT = "wine-quality"
-DEFAULT_MODEL = "wine-quality"
-KNOWN_METRICS = {"f1"}
-PROVENANCE_TAGS = ("data.md5", "data.tag", "data.commit", "git.commit", "quality_gate")
 
 
 def client():
@@ -28,9 +28,14 @@ def iso(ms: int | None) -> str | None:
     return datetime.fromtimestamp(ms / 1000, UTC).isoformat() if ms else None
 
 
+def provenance(tags: dict) -> dict:
+    """The run's provenance tags, keyed by role (data_hash, data_commit, ...)."""
+    names = settings().mlflow.tags.model_dump()
+    return {role: tags[name] for role, name in names.items() if name in tags}
+
+
 def summarize(run) -> dict:
     """A small, plain view of a run: what the agent needs, nothing more."""
-    tags = run.data.tags
     return {
         "run_id": run.info.run_id,
         "experiment_id": run.info.experiment_id,
@@ -38,11 +43,12 @@ def summarize(run) -> dict:
         "start_time": iso(run.info.start_time),
         "metrics": run.data.metrics,
         "params": run.data.params,
-        "tags": {k: tags[k] for k in PROVENANCE_TAGS if k in tags},
+        "provenance": provenance(run.data.tags),
     }
 
 
-def experiment_id(name_or_id: str) -> str:
+def experiment_id(name_or_id: str | None) -> str:
+    name_or_id = required(name_or_id or settings().mlflow.experiment, "experiment")
     c = client()
     exp = c.get_experiment_by_name(name_or_id)
     if exp is None and name_or_id.isdigit():
@@ -52,8 +58,30 @@ def experiment_id(name_or_id: str) -> str:
     return exp.experiment_id
 
 
+def model_name(model: str | None) -> str:
+    return required(model or settings().mlflow.registered_model, "registered model")
+
+
+def deployed_version(model: str):
+    """The registry version behind the 'deployed' alias, or None if the alias isn't set."""
+    try:
+        return client().get_model_version_by_alias(model, settings().mlflow.aliases.deployed)
+    except Exception as exc:
+        if "not found" in str(exc).lower() or "RESOURCE_DOES_NOT_EXIST" in str(exc):
+            return None
+        raise
+
+
+def source_run_id(version) -> str:
+    return version.tags.get("source_run") or version.run_id
+
+
+Experiment = Field(None, description="Experiment name or numeric ID; omit for the project default")
+Model = Field(None, description="Registered model name; omit for the project default")
+
+
 class ExperimentArgs(Args):
-    experiment: str = Field(DEFAULT_EXPERIMENT, description="Experiment name or numeric ID")
+    experiment: str | None = Experiment
     limit: int = Field(10, ge=1, le=50, description="Most recent runs to return")
 
 
@@ -62,8 +90,8 @@ class RunArgs(Args):
 
 
 class BestRunArgs(Args):
-    metric: str = Field("f1", description="Metric to rank by. Known metrics: f1")
-    experiment: str = Field(DEFAULT_EXPERIMENT, description="Experiment name or numeric ID")
+    metric: str | None = Field(None, description="Metric to rank by; omit for the primary metric")
+    experiment: str | None = Experiment
 
 
 class CompareRunsArgs(Args):
@@ -71,17 +99,21 @@ class CompareRunsArgs(Args):
 
 
 class ModelArgs(Args):
-    model: str = Field(DEFAULT_MODEL, description="Registered model name")
+    model: str | None = Model
 
 
 @tool(NoArgs)
 def list_experiments(_: NoArgs) -> dict:
-    """List MLflow experiments with their IDs."""
+    """List MLflow experiments with their IDs, and the project's default experiment and model."""
+    cfg = settings().mlflow
     return {
         "experiments": [
             {"experiment_id": e.experiment_id, "name": e.name}
             for e in client().search_experiments()
-        ]
+        ],
+        "default_experiment": cfg.experiment,
+        "default_registered_model": cfg.registered_model,
+        "primary_metric": cfg.primary_metric,
     }
 
 
@@ -94,7 +126,7 @@ def list_runs(args: ExperimentArgs) -> dict:
         order_by=["attributes.start_time DESC"],
         max_results=args.limit,
     )
-    return {"experiment": args.experiment, "runs": [summarize(r) for r in runs]}
+    return {"runs": [summarize(r) for r in runs]}
 
 
 @tool(RunArgs)
@@ -109,18 +141,17 @@ def get_run_details(args: RunArgs) -> dict:
 @tool(BestRunArgs)
 def get_best_run(args: BestRunArgs) -> dict:
     """Find the run with the highest value of a metric. Runs without the metric are excluded,
-    never ranked. The best metric alone does not mean production-ready: check quality_gate and
-    the dataset version."""
-    if args.metric not in KNOWN_METRICS:
-        raise ValueError(f"unknown metric {args.metric!r}; known: {sorted(KNOWN_METRICS)}")
-    exp = experiment_id(args.experiment)
-    runs = client().search_runs([exp], max_results=500)
-    ranked = [r for r in runs if args.metric in r.data.metrics]
+    never ranked. The best metric alone does not mean production-ready: check the quality gate
+    and the dataset version."""
+    metric = required(args.metric or settings().mlflow.primary_metric, "metric")
+    runs = client().search_runs([experiment_id(args.experiment)], max_results=500)
+    ranked = [r for r in runs if metric in r.data.metrics]
     if not ranked:
-        raise ValueError(f"no run in {args.experiment!r} has logged {args.metric!r}")
-    ranked.sort(key=lambda r: r.data.metrics[args.metric], reverse=True)
+        logged = sorted({m for r in runs for m in r.data.metrics})
+        raise ValueError(f"no run has logged metric {metric!r}; metrics logged: {logged}")
+    ranked.sort(key=lambda r: r.data.metrics[metric], reverse=True)
     return {
-        "metric": args.metric,
+        "metric": metric,
         "best": summarize(ranked[0]),
         "runner_up": summarize(ranked[1]) if len(ranked) > 1 else None,
         "runs_ranked": len(ranked),
@@ -137,84 +168,96 @@ def compare_runs(args: CompareRunsArgs) -> dict:
 
 @tool(ModelArgs)
 def get_registry_info(args: ModelArgs) -> dict:
-    """List versions of a registered model with their aliases (candidate, champion), source run,
-    F1 and dataset version."""
+    """List versions of a registered model with their aliases, source run, primary metric and
+    dataset version."""
     c = client()
-    model = c.get_registered_model(args.model)
+    name = model_name(args.model)
+    metric = settings().mlflow.primary_metric
+    model = c.get_registered_model(name)
     aliases_by_version: dict[str, list[str]] = {}
     for alias, version in model.aliases.items():
         aliases_by_version.setdefault(str(version), []).append(alias)
 
     versions = []
-    for v in c.search_model_versions(f"name='{args.model}'"):
-        run = c.get_run(v.run_id) if v.run_id else None
+    for v in c.search_model_versions(f"name='{name}'"):
+        run_id = source_run_id(v)
+        run = c.get_run(run_id) if run_id else None
         versions.append(
             {
                 "version": v.version,
                 "aliases": aliases_by_version.get(str(v.version), []),
-                "source_run": v.tags.get("source_run", v.run_id),
+                "source_run": run_id,
                 "created": iso(v.creation_timestamp),
-                "f1": run.data.metrics.get("f1") if run else None,
-                "data_tag": run.data.tags.get("data.tag") if run else None,
+                "metrics": {metric: run.data.metrics.get(metric)} if run and metric else None,
+                "provenance": provenance(run.data.tags) if run else None,
             }
         )
     versions.sort(key=lambda v: int(v["version"]), reverse=True)
-    return {"model": args.model, "aliases": dict(model.aliases), "versions": versions}
+    return {"model": name, "aliases": dict(model.aliases), "versions": versions}
 
 
 @tool(RunArgs)
 def get_dataset_for_run(args: RunArgs) -> dict:
     """Identify the dataset version a run was trained on, verified against Git: compares the run's
     recorded data hash with the DVC pointer at the recorded data commit."""
-    tags = client().get_run(args.run_id).data.tags
-    recorded = {k: tags.get(k) for k in ("data.md5", "data.tag", "data.commit", "git.commit")}
-    missing = [k for k in ("data.md5", "data.commit") if not recorded[k]]
+    recorded = provenance(client().get_run(args.run_id).data.tags)
+    missing = [role for role in ("data_hash", "data_commit") if role not in recorded]
     if missing:
+        names = settings().mlflow.tags.model_dump()
         return {
             "run_id": args.run_id,
             "recorded": recorded,
             "verified": False,
-            "finding": f"run is missing provenance tags {missing}; its dataset cannot be verified",
+            "finding": f"run is missing provenance tags {[names[m] for m in missing]}; "
+            "its dataset cannot be verified",
         }
-    pointer = dvc_tools.pointer_at(recorded["data.commit"])
+    path = dvc_tools.resolve_dataset(recorded.get("data_path"))
+    pointer = dvc_tools.pointer_at(recorded["data_commit"], path)
     return {
         "run_id": args.run_id,
+        "dataset": path,
         "recorded": recorded,
         "pointer_md5_at_data_commit": pointer["md5"],
-        "verified": pointer["md5"] == recorded["data.md5"],
-        "data_tag_for_hash": dvc_tools.tag_for_md5(recorded["data.md5"]),
+        "verified": pointer["md5"] == recorded["data_hash"],
+        "version_tag_for_hash": dvc_tools.tag_for_md5(recorded["data_hash"], path),
     }
 
 
 @tool(ModelArgs)
 def get_retraining_signals(args: ModelArgs) -> dict:
-    """Facts for deciding whether to retrain the deployed (champion) model: newer data available,
-    model age, and its quality gate result. Reports evidence; does not decide."""
-    c = client()
-    max_age_days = int(os.environ.get("MODEL_MAX_AGE_DAYS", "30"))
-    try:
-        version = c.get_model_version_by_alias(args.model, "champion")
-    except Exception as exc:
-        if "not found" not in str(exc).lower() and "RESOURCE_DOES_NOT_EXIST" not in str(exc):
-            raise
-        return {"model": args.model, "champion": None, "finding": "no champion alias is set"}
+    """Facts for deciding whether to retrain the deployed model (the 'deployed' alias): newer data
+    available, model age, and its quality gate result. Reports evidence; does not decide."""
+    cfg = settings().mlflow
+    name = model_name(args.model)
+    version = deployed_version(name)
+    if version is None:
+        return {"model": name, "deployed": None, "finding": f"no {cfg.aliases.deployed!r} alias"}
 
-    run = c.get_run(version.tags.get("source_run", version.run_id))
-    trained_md5 = run.data.tags.get("data.md5")
-    current = dvc_tools.pointer_at("HEAD")
+    run = client().get_run(source_run_id(version))
+    recorded = provenance(run.data.tags)
+    path = dvc_tools.resolve_dataset(recorded.get("data_path"))
+    current = dvc_tools.pointer_at("HEAD", path)
     age_days = (datetime.now(UTC).timestamp() * 1000 - run.info.start_time) / 86_400_000
     return {
-        "model": args.model,
-        "champion_version": version.version,
+        "model": name,
+        "deployed_alias": cfg.aliases.deployed,
+        "deployed_version": version.version,
         "source_run": run.info.run_id,
-        "trained_on": {"md5": trained_md5, "data_tag": run.data.tags.get("data.tag")},
-        "current_data": {"md5": current["md5"], "data_tag": dvc_tools.tag_for_md5(current["md5"])},
-        "newer_data_available": trained_md5 != current["md5"],
+        "dataset": path,
+        "trained_on": {
+            "md5": recorded.get("data_hash"),
+            "version_tag": recorded.get("data_version"),
+        },
+        "current_data": {
+            "md5": current["md5"],
+            "version_tag": dvc_tools.tag_for_md5(current["md5"], path),
+        },
+        "newer_data_available": recorded.get("data_hash") != current["md5"],
         "model_age_days": round(age_days, 1),
-        "max_age_days": max_age_days,
-        "too_old": age_days > max_age_days,
-        "quality_gate": run.data.tags.get("quality_gate"),
-        "f1": run.data.metrics.get("f1"),
+        "max_age_days": cfg.model_max_age_days,
+        "too_old": age_days > cfg.model_max_age_days,
+        "quality_gate": recorded.get("quality_gate"),
+        "metrics": run.data.metrics,
         "degradation_evidence": "not checked here: call check_prediction_drift for input drift; "
         "live accuracy needs true labels, which the system does not have",
     }

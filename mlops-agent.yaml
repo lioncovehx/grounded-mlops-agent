@@ -1,0 +1,40 @@
+# The ML project this agent manages. Every key is optional: missing values use generic
+# defaults, or the agent asks for them. Secrets and service URLs stay in .env.
+project: wine-quality
+
+dvc:
+  repo_dir: .
+  version_tag_pattern: "data-*"
+  default_dataset: data/raw/wine.csv
+
+mlflow:
+  experiment: wine-quality
+  registered_model: wine-quality
+  primary_metric: f1
+  aliases:
+    candidate: candidate
+    deployed: champion
+  model_max_age_days: 30
+  tags:                          # run tags written by training/train.py
+    data_hash: data.md5
+    data_version: data.tag
+    data_commit: data.commit
+    data_path: data.path
+    code_commit: git.commit
+    quality_gate: quality_gate
+  feature_stats_artifact: feature_stats.json
+
+airflow:
+  default_dag: training_pipeline
+  allowed_dags: [training_pipeline]  # the only DAGs the agent may trigger
+
+kubernetes:
+  namespace: wine-quality            # the only namespace the agent may touch
+  default_deployment: wine-quality-api
+  pod_selector: app.kubernetes.io/name=wine-quality-api
+  model_version_label: mlops/model-version
+
+monitoring:
+  prediction_event: prediction
+  drift_threshold_std: 0.5
+  min_predictions: 30

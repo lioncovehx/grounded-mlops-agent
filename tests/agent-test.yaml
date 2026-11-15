@@ -1,0 +1,13 @@
+# Test project: names deliberately differ from the demo project.
+project: test-project
+mlflow:
+  experiment: test-experiment
+  registered_model: test-model
+  primary_metric: f1
+airflow:
+  default_dag: training_pipeline
+  allowed_dags: [training_pipeline]
+kubernetes:
+  namespace: ml-serving
+  default_deployment: test-api
+  pod_selector: app.kubernetes.io/name=test-api

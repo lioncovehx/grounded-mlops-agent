@@ -69,6 +69,7 @@ def provenance() -> dict[str, str]:
                 "data.md5": md5,
                 "data.tag": tag,
                 "data.commit": run("git", "rev-list", "-n", "1", tag),
+                "data.path": "data/raw/wine.csv",
                 "git.commit": run("git", "rev-parse", "HEAD"),
             }
     raise SystemExit(f"data md5 {md5} matches no data-* tag; version the data before training")
@@ -124,6 +125,15 @@ def train(args) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(model, path)
         mlflow.log_artifact(str(path))
+        # Baseline for drift monitoring: per-feature mean/std of the training inputs.
+        stats = {
+            "features": {
+                c: {"mean": float(X_train[c].mean()), "std": float(X_train[c].std())}
+                for c in X_train.columns
+            },
+            "label_positive_rate": float(y_train.mean()),
+        }
+        mlflow.log_dict(stats, "feature_stats.json")
         # We built this model, so its tree storage is safe for MLflow's skops serializer.
         info = mlflow.sklearn.log_model(
             model, name="model", skops_trusted_types=["sklearn.tree._tree.Tree"]

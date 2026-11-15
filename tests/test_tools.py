@@ -44,16 +44,16 @@ def test_best_run_is_highest_f1_and_skips_runs_without_the_metric(fake_mlflow):
     result = execute_tool("get_best_run", {"metric": "f1"}, "t1")
     assert result["status"] == "ok"
     assert result["data"]["best"]["run_id"] == "b" * 32
-    assert result["data"]["best"]["tags"]["quality_gate"] == "passed"
+    assert result["data"]["best"]["provenance"]["quality_gate"] == "passed"
     assert result["data"]["runner_up"]["run_id"] == "a" * 32
     assert result["data"]["runs_missing_metric"] == 1
 
 
-def test_unknown_metric_is_rejected(fake_mlflow):
+def test_metric_no_run_logged_is_rejected_with_the_metrics_available(fake_mlflow):
+    fake_mlflow.search_runs.return_value = [make_run("a" * 32, f1=0.41)]
     result = execute_tool("get_best_run", {"metric": "accuracy"}, "t2")
     assert result["status"] == "error"
-    assert "unknown metric" in result["error"]
-    fake_mlflow.search_runs.assert_not_called()
+    assert "metrics logged: ['f1']" in result["error"]
 
 
 def test_mlflow_down_is_reported_as_unavailable(monkeypatch):
@@ -112,7 +112,7 @@ def test_confirmed_restart_patches_the_deployment(fake_k8s):
     result = execute_tool("restart_deployment", {"name": "wine-api"}, "t8", confirmed=True)
     assert result["status"] == "ok"
     name, namespace, patch = apps.patch_namespaced_deployment.call_args.args
-    assert (name, namespace) == ("wine-api", "mlops-app")
+    assert (name, namespace) == ("wine-api", "ml-serving")
     assert (
         "kubectl.kubernetes.io/restartedAt" in patch["spec"]["template"]["metadata"]["annotations"]
     )
@@ -192,28 +192,27 @@ def _prediction_log(rows, sugar):
     lines = ['INFO:     10.244.0.1:5555 - "GET /health/ready HTTP/1.1" 200 OK']
     for i in range(rows):
         features = {"alcohol": 10.0 + (i % 5) * 0.1, "residual_sugar": sugar + (i % 3)}
-        event = {"event": "prediction", "model_version": "4", "good_quality": i % 5 == 0}
-        lines.append("INFO:wine-api:" + json.dumps({**event, "features": features}))
+        event = {"event": "prediction", "model_version": "4", "prediction": i % 5 == 0}
+        lines.append("INFO:api:" + json.dumps({**event, "features": features}))
     return "\n".join(lines)
 
 
 @pytest.fixture
 def drift_setup(monkeypatch):
-    import pandas as pd
-
     from agent.tools import monitoring_tools
 
-    base = pd.DataFrame(
-        {
-            "alcohol": [9.5, 10.0, 10.5, 11.0] * 25,
-            "residual_sugar": [2.0, 4.0, 6.0, 8.0] * 25,
-            "good": [0, 0, 0, 1] * 25,
-        }
-    )
-    tags = {"data.tag": "data-v2", "data.commit": "c2"}
-    monkeypatch.setattr(monitoring_tools, "champion_baseline", lambda: ("4", tags, base))
+    stats = {
+        "version": "4",
+        "run_id": "r" * 32,
+        "features": {
+            "alcohol": {"mean": 10.25, "std": 0.56},
+            "residual_sugar": {"mean": 5.0, "std": 2.24},
+        },
+        "label_positive_rate": 0.25,
+    }
+    monkeypatch.setattr(monitoring_tools, "baseline", lambda: stats)
     core = MagicMock()
-    pod = SimpleNamespace(metadata=SimpleNamespace(name="wine-api-1"))
+    pod = SimpleNamespace(metadata=SimpleNamespace(name="test-api-1"))
     core.list_namespaced_pod.return_value = SimpleNamespace(items=[pod])
     monkeypatch.setattr(kubernetes_tools, "clients", lambda: (core, MagicMock()))
     return core
@@ -225,7 +224,13 @@ def test_drift_is_flagged_when_live_inputs_shift(drift_setup):
     assert data["predictions_found"] == 40
     assert data["drift_detected"] is True
     assert data["drifted_features"] == ["residual_sugar"]
-    assert data["baseline"]["data_tag"] == "data-v2"
+    assert data["baseline_run"] == "r" * 32
+    assert data["positive_rate"] == {"live_predictions": 0.2, "training_labels": 0.25}
+    # Pods are found with the configured selector, in the configured namespace.
+    assert drift_setup.list_namespaced_pod.call_args.args == ("ml-serving",)
+    assert drift_setup.list_namespaced_pod.call_args.kwargs["label_selector"] == (
+        "app.kubernetes.io/name=test-api"
+    )
 
 
 def test_no_drift_when_live_inputs_match_training(drift_setup):
@@ -246,3 +251,41 @@ def test_drift_check_refuses_other_namespaces(drift_setup):
     result = execute_tool("check_prediction_drift", {"namespace": "kube-system"}, "t16")
     assert result["status"] == "error"
     drift_setup.list_namespaced_pod.assert_not_called()
+
+
+def test_tool_defaults_come_from_the_config(fake_k8s):
+    # agent-test.yaml names the deployment test-api; no name argument is given.
+    _, apps = fake_k8s
+    execute_tool("restart_deployment", {}, "t17", confirmed=True)
+    assert apps.patch_namespaced_deployment.call_args.args[:2] == ("test-api", "ml-serving")
+
+
+def test_missing_setting_without_argument_gives_a_clear_error(monkeypatch, tmp_path, fake_mlflow):
+    from agent.config import settings
+
+    (tmp_path / "empty.yaml").write_text("project: other\n")
+    monkeypatch.setenv("MLOPS_AGENT_CONFIG", str(tmp_path / "empty.yaml"))
+    settings.cache_clear()
+    result = execute_tool("list_runs", {}, "t18")
+    assert result["status"] == "error"
+    assert "no experiment given and none configured" in result["error"]
+
+
+def test_config_rejects_unknown_keys(tmp_path):
+    from pydantic import ValidationError
+
+    from agent.config import load
+
+    (tmp_path / "bad.yaml").write_text("kubernetes:\n  namespce: typo\n")
+    with pytest.raises(ValidationError):
+        load(tmp_path / "bad.yaml")
+
+
+def test_dataset_is_discovered_or_must_be_named(monkeypatch):
+    monkeypatch.setattr(dvc_tools, "tracked_datasets", lambda: ["data/a.csv"])
+    assert dvc_tools.resolve_dataset(None) == "data/a.csv"
+    monkeypatch.setattr(dvc_tools, "tracked_datasets", lambda: ["data/a.csv", "data/b.csv"])
+    with pytest.raises(ValueError, match="several datasets"):
+        dvc_tools.resolve_dataset(None)
+    with pytest.raises(ValueError, match="not a DVC-tracked dataset"):
+        dvc_tools.resolve_dataset("../etc/passwd")

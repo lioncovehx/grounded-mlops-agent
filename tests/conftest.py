@@ -1,18 +1,25 @@
 """Shared test setup: no real service is ever contacted."""
 
+from pathlib import Path
+
 import pytest
+
+from agent.config import settings
+
+CONFIG = Path(__file__).parent / "agent-test.yaml"
 
 
 @pytest.fixture(autouse=True)
 def isolated_env(monkeypatch):
-    # Point every client at closed local ports, so a missed mock fails fast instead of
-    # reaching a real service.
+    # Closed local ports: a missed mock fails fast instead of reaching a real service.
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:9")
     monkeypatch.setenv("AIRFLOW_BASE_URL", "http://127.0.0.1:9")
     monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:9/v1")
-    monkeypatch.setenv("AGENT_ALLOWED_NAMESPACE", "mlops-app")
-    monkeypatch.setenv("AGENT_ALLOWED_DAGS", "training_pipeline")
     monkeypatch.setenv("MLFLOW_DISABLE_AGENT_HINT", "1")
+    monkeypatch.setenv("MLOPS_AGENT_CONFIG", str(CONFIG))
+    settings.cache_clear()
+    yield
+    settings.cache_clear()
 
 
 class FakeLLM:

@@ -68,8 +68,8 @@ def predict(wine: Wine) -> dict:
             {
                 "event": "prediction",
                 "model_version": MODEL_VERSION,
-                "good_quality": good,
                 "features": features,
+                "prediction": good,
             }
         )
     )

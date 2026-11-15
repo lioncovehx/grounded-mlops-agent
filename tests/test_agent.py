@@ -39,10 +39,11 @@ def services(monkeypatch):
     ml.get_run.return_value = run
     monkeypatch.setattr(mlflow_tools, "client", lambda: ml)
 
+    monkeypatch.setattr(dvc_tools, "pointer_at", lambda rev, path: {"md5": "m2", "size_bytes": 1})
     monkeypatch.setattr(
-        dvc_tools, "pointer_at", lambda rev, path=None: {"md5": "m2", "size_bytes": 1}
+        dvc_tools, "data_tags", lambda path: {"data-v2": {"md5": "m2", "commit": "c2"}}
     )
-    monkeypatch.setattr(dvc_tools, "data_tags", lambda: {"data-v2": {"md5": "m2", "commit": "c2"}})
+    monkeypatch.setattr(dvc_tools, "tracked_datasets", lambda: ["data/raw/wine.csv"])
 
     af = MagicMock(
         side_effect=lambda method, path, **kw: {
@@ -58,7 +59,7 @@ def services(monkeypatch):
         spec=SimpleNamespace(
             replicas=2,
             template=SimpleNamespace(
-                metadata=SimpleNamespace(labels={"model-version": "4"}),
+                metadata=SimpleNamespace(labels={"mlops/model-version": "4"}),
                 spec=SimpleNamespace(containers=[SimpleNamespace(image="wine-api:0.1.0")]),
             ),
         ),

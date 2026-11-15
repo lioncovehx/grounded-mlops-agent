@@ -9,8 +9,8 @@ stages:
       size: 379241
     - path: training/train.py
       hash: md5
-      md5: b4f745a131dbce1d2d892b88a541741d
-      size: 6670
+      md5: 960f8be6b613cedc786143378d4096fa
+      size: 7113
     outs:
     - path: data/processed/wine.csv
       hash: md5

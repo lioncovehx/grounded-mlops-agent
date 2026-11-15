@@ -1,10 +1,11 @@
-"""Kubernetes tools, limited to one approved namespace."""
+"""Kubernetes tools, limited to the project's namespace from the config."""
 
 import os
 from datetime import UTC, datetime
 
 from pydantic import Field
 
+from agent.config import required, settings
 from agent.registry import Args, tool
 
 REQUEST_TIMEOUT = 10
@@ -12,7 +13,7 @@ MAX_LOG_LINES = 100
 
 
 def allowed_namespace() -> str:
-    return os.environ.get("AGENT_ALLOWED_NAMESPACE", "mlops-app")
+    return settings().kubernetes.namespace
 
 
 def clients():
@@ -25,7 +26,7 @@ def clients():
 
 class NamespaceArgs(Args):
     namespace: str = Field(
-        default_factory=allowed_namespace, description="Kubernetes namespace (only mlops-app)"
+        default_factory=allowed_namespace, description="Namespace; only the project's is allowed"
     )
 
     def checked(self) -> str:
@@ -45,7 +46,12 @@ class PodArgs(NamespaceArgs):
 
 
 class DeploymentArgs(NamespaceArgs):
-    name: str = Field("wine-api", pattern=r"^[a-z0-9.-]+$", description="Deployment name")
+    name: str | None = Field(
+        None, pattern=r"^[a-z0-9.-]+$", description="Deployment; omit for the inference service"
+    )
+
+    def deployment(self) -> str:
+        return required(self.name or settings().kubernetes.default_deployment, "deployment")
 
 
 def pod_summary(pod) -> dict:
@@ -82,7 +88,9 @@ def deployment_summary(d) -> dict:
         "updated": d.status.updated_replicas or 0,
         "unavailable": d.status.unavailable_replicas or 0,
         "images": [c.image for c in d.spec.template.spec.containers],
-        "model_version": (d.spec.template.metadata.labels or {}).get("model-version"),
+        "model_version": (d.spec.template.metadata.labels or {}).get(
+            settings().kubernetes.model_version_label
+        ),
     }
 
 
@@ -183,7 +191,7 @@ def get_deployed_version(args: DeploymentArgs) -> dict:
     """Which image and model version a Deployment runs, and whether its rollout is complete."""
     ns = args.checked()
     _, apps = clients()
-    d = apps.read_namespaced_deployment(args.name, ns, _request_timeout=REQUEST_TIMEOUT)
+    d = apps.read_namespaced_deployment(args.deployment(), ns, _request_timeout=REQUEST_TIMEOUT)
     summary = deployment_summary(d)
     # Complete only when every replica runs the current spec: during a stuck rollout the old
     # Pods are still available, so comparing available with desired alone is misleading.
@@ -205,5 +213,5 @@ def restart_deployment(args: DeploymentArgs) -> dict:
             "template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}}
         }
     }
-    apps.patch_namespaced_deployment(args.name, ns, patch, _request_timeout=REQUEST_TIMEOUT)
-    return {"deployment": args.name, "namespace": ns, "restarted_at": now}
+    apps.patch_namespaced_deployment(args.deployment(), ns, patch, _request_timeout=REQUEST_TIMEOUT)
+    return {"deployment": args.deployment(), "namespace": ns, "restarted_at": now}
