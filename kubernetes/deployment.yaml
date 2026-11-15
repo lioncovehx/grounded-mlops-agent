@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wine-api
+  namespace: mlops-app
+  labels:
+    app: wine-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wine-api
+  template:
+    metadata:
+      labels:
+        app: wine-api
+        # MLflow registry version baked into the image; compared with the champion alias.
+        model-version: "4"
+    spec:
+      containers:
+        - name: wine-api
+          image: wine-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: wine-api-config
+          # Ready once the model is loaded; live as long as the process answers.
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

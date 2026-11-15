@@ -26,3 +26,6 @@ outputs/
 /logs/
 /plugins/
 /config/
+
+# Model baked into the inference image
+/model/
