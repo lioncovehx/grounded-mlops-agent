@@ -21,3 +21,8 @@ mlflow.db
 
 # Local model copies
 outputs/
+
+# Airflow runtime folders
+/logs/
+/plugins/
+/config/
