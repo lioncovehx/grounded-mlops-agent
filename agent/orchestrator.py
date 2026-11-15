@@ -127,8 +127,11 @@ def failure_note(evidence: list[dict]) -> str | None:
     return f"Note: these tool calls did not succeed, so their data is missing from this answer: {names}."
 
 
-def run_agent(message: str, request_id: str, llm=call_llm) -> dict:
-    messages: list[dict] = [{"role": "user", "content": message}]
+def run_agent(
+    message: str, request_id: str, llm=call_llm, history: list[dict] | None = None
+) -> dict:
+    # Earlier turns are plain text only: past tool results aren't replayed, so evidence is fresh.
+    messages: list[dict] = [*(history or []), {"role": "user", "content": message}]
     evidence: list[dict] = []
     pending_id = None
     schemas = tool_schemas()
@@ -162,8 +165,8 @@ def run_agent(message: str, request_id: str, llm=call_llm) -> dict:
                     pending_id = _store_pending(name, result["data"]["arguments"], request_id)
                     result["data"]["pending_action_id"] = pending_id
                     result["error"] = (
-                        "Not run. The user must confirm it outside this chat; tell them it is "
-                        "waiting for confirmation."
+                        "Not run. It waits for the user's Confirm button, which you cannot "
+                        "press; tell them it is waiting for their confirmation."
                     )
             evidence.append(result)
             content = json.dumps(result, default=str)

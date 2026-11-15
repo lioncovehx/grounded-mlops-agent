@@ -1,24 +1,34 @@
-"""HTTP interface for the agent.
+"""HTTP interface for the agent, plus a chat page at /.
 
-Changes proposed by the agent are confirmed through /actions/{id}/confirm, which only a
-person calling this API can reach; the LLM has no tool for it.
+Changes are confirmed through /actions/{id}/confirm, which only a person can call;
+the LLM has no tool for it.
 """
 
 import logging
 import uuid
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from agent.config import settings
 from agent.orchestrator import confirm_action, run_agent, take_pending
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 app = FastAPI(title="Grounded MLOps Agent")
+CHAT_PAGE = Path(__file__).parent / "static" / "chat.html"
+
+
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    history: list[Turn] = Field(default_factory=list, max_length=10)
 
 
 class Evidence(BaseModel):
@@ -41,7 +51,8 @@ class ChatResponse(BaseModel):
 def chat(req: ChatRequest) -> dict:
     if not req.message.strip():
         raise HTTPException(422, "message is empty")
-    return run_agent(req.message, uuid.uuid4().hex[:12])
+    history = [t.model_dump() for t in req.history]
+    return run_agent(req.message, uuid.uuid4().hex[:12], history=history)
 
 
 @app.post("/actions/{action_id}/confirm", response_model=ChatResponse)
@@ -61,4 +72,9 @@ def cancel(action_id: str) -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "project": settings().project}
+
+
+@app.get("/", include_in_schema=False)
+def chat_page() -> FileResponse:
+    return FileResponse(CHAT_PAGE)

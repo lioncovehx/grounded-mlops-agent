@@ -49,7 +49,7 @@ flowchart LR
 | Tool runner: validation, confirmation, timeouts, structured logs | `agent/registry.py` |
 | Agent loop and system prompt | `agent/orchestrator.py` |
 | LLM adapter | `agent/llm.py` |
-| Chat API | `agent/main.py` |
+| Chat API and chat page | `agent/main.py`, `agent/static/chat.html` |
 | Demo project: training stages | `training/train.py` |
 | Demo project: Airflow pipeline | `dags/training_pipeline.py`, `infra/airflow/Dockerfile` |
 | Demo project: inference service | `api/main.py`, `Dockerfile` |
@@ -182,16 +182,22 @@ set -a; source .env; set +a
 uvicorn agent.main:app --port 8001
 ```
 
-Interactive API docs are at http://localhost:8001/docs.
+The chat page is at http://localhost:8001, and the API docs at http://localhost:8001/docs.
 
 ## Interacting with the agent
+
+**In the browser:** open http://localhost:8001. Each answer lists the tool calls behind it (click one to see its raw data), follow-up questions keep the conversation's context, and changes show **Confirm** and **Cancel** buttons.
+
+![Chat page: an answer with its evidence, and a pipeline run waiting for confirmation](reports/evidence/screenshots/chat-ui.png)
+
+**Over HTTP:**
 
 ```bash
 curl -s localhost:8001/chat -H 'Content-Type: application/json' \
   -d '{"message": "Why did the latest training run fail?"}' | jq
 ```
 
-Every response has `answer`, `evidence` (one envelope per tool call: `tool`, `status`, `data`, `error`, `duration_ms`, `request_id`), `request_id`, and `pending_action_id`.
+Send earlier turns as `"history": [{"role": "user" | "assistant", "content": "..."}]` (up to 10) for follow-up questions. Every response has `answer`, `evidence` (one envelope per tool call: `tool`, `status`, `data`, `error`, `duration_ms`, `request_id`), `request_id`, and `pending_action_id`.
 
 **Confirming changes.** Restarting a deployment and triggering a pipeline never run straight from a chat. The response carries a `pending_action_id` instead:
 
