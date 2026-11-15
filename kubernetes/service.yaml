@@ -1,14 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: wine-api
-  namespace: mlops-app
-  labels:
-    app: wine-api
+  name: wine-quality-api
 spec:
   type: ClusterIP
   selector:
-    app: wine-api
+    app.kubernetes.io/name: wine-quality-api
   ports:
-    - port: 80
-      targetPort: 8000
+    - name: http
+      port: 80
+      targetPort: http

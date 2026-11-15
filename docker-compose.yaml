@@ -44,13 +44,16 @@
 #
 # Feel free to modify this file to suit your needs.
 ---
+# Fixed project name, so container names don't depend on the folder name.
+name: grounded-mlops
+
 x-airflow-common:
   &airflow-common
   # In order to add custom dependencies or upgrade provider distributions you can use your extended image.
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
   # Airflow plus a separate virtual environment with this project's pinned packages.
-  image: grounded-mlops-airflow:3.4.0
+  image: mlops-airflow:3.4.0
   build:
     context: .
     dockerfile: infra/airflow/Dockerfile
@@ -351,6 +354,9 @@ services:
       - mlflow-data:/mlflow
     restart: always
 
+# Explicit names keep the existing MLflow runs and Airflow history.
 volumes:
   postgres-db-volume:
+    name: mlopsaiagent_postgres-db-volume
   mlflow-data:
+    name: mlopsaiagent_mlflow-data

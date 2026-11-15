@@ -1,0 +1,36 @@
+# Deploy with: kubectl apply -k kubernetes/
+# To ship a new model, change the version values below (image tag and labels) together.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: wine-quality
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - rbac.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: wine-quality
+      app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: wine-quality-api
+    newTag: model-v6
+
+patches:
+  - target:
+      kind: Deployment
+      name: wine-quality-api
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/labels/app.kubernetes.io~1version
+        value: model-v6
+      - op: add
+        path: /spec/template/metadata/labels/mlops~1model-version
+        value: "6"
+      - op: add
+        path: /spec/template/metadata/labels/app.kubernetes.io~1component
+        value: inference

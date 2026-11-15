@@ -1,8 +1,6 @@
 """Training pipeline: validate, preprocess, train, evaluate and gate the wine quality model.
 
-Each task runs one stage of training/train.py in the project's own virtual environment.
-The train task's last output line (the MLflow run ID) becomes its XCom value, which the
-evaluate and gate tasks receive as --run-id.
+The train task's last output line (the run ID) is its XCom value, passed on as --run-id.
 """
 
 from datetime import timedelta
