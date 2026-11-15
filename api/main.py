@@ -15,7 +15,7 @@ MODEL_PATH = Path(os.environ.get("MODEL_PATH", "model/model.joblib"))
 MODEL_VERSION = os.environ.get("MODEL_VERSION", "unknown")
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
-log = logging.getLogger("wine-api")
+log = logging.getLogger("wine-quality-api")
 state: dict = {}
 
 

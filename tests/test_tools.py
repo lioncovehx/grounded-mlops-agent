@@ -93,7 +93,7 @@ def fake_k8s(monkeypatch):
 def test_restart_outside_approved_namespace_never_reaches_kubernetes(fake_k8s, namespace):
     _, apps = fake_k8s
     result = execute_tool(
-        "restart_deployment", {"name": "wine-api", "namespace": namespace}, "t6", confirmed=True
+        "restart_deployment", {"name": "test-api", "namespace": namespace}, "t6", confirmed=True
     )
     assert result["status"] == "error"
     assert "outside the approved namespace" in result["error"]
@@ -102,17 +102,17 @@ def test_restart_outside_approved_namespace_never_reaches_kubernetes(fake_k8s, n
 
 def test_restart_without_confirmation_does_nothing(fake_k8s):
     _, apps = fake_k8s
-    result = execute_tool("restart_deployment", {"name": "wine-api"}, "t7")
+    result = execute_tool("restart_deployment", {"name": "test-api"}, "t7")
     assert result["status"] == "confirmation_required"
     apps.patch_namespaced_deployment.assert_not_called()
 
 
 def test_confirmed_restart_patches_the_deployment(fake_k8s):
     _, apps = fake_k8s
-    result = execute_tool("restart_deployment", {"name": "wine-api"}, "t8", confirmed=True)
+    result = execute_tool("restart_deployment", {"name": "test-api"}, "t8", confirmed=True)
     assert result["status"] == "ok"
     name, namespace, patch = apps.patch_namespaced_deployment.call_args.args
-    assert (name, namespace) == ("wine-api", "ml-serving")
+    assert (name, namespace) == ("test-api", "ml-serving")
     assert (
         "kubectl.kubernetes.io/restartedAt" in patch["spec"]["template"]["metadata"]["annotations"]
     )
@@ -172,12 +172,12 @@ def test_stuck_rollout_is_not_reported_complete(fake_k8s):
     # Seen live: a bad image tag left the old Pods available while the new one could not pull.
     _, apps = fake_k8s
     apps.read_namespaced_deployment.return_value = SimpleNamespace(
-        metadata=SimpleNamespace(name="wine-api"),
+        metadata=SimpleNamespace(name="test-api"),
         spec=SimpleNamespace(
             replicas=2,
             template=SimpleNamespace(
                 metadata=SimpleNamespace(labels={}),
-                spec=SimpleNamespace(containers=[SimpleNamespace(image="wine-api:0.2.0")]),
+                spec=SimpleNamespace(containers=[SimpleNamespace(image="test-api:v1")]),
             ),
         ),
         status=SimpleNamespace(
@@ -289,3 +289,20 @@ def test_dataset_is_discovered_or_must_be_named(monkeypatch):
         dvc_tools.resolve_dataset(None)
     with pytest.raises(ValueError, match="not a DVC-tracked dataset"):
         dvc_tools.resolve_dataset("../etc/passwd")
+
+
+def test_drift_check_skips_pods_without_logs(drift_setup):
+    # Seen live: a Pod stuck in ImagePullBackOff made the log read fail with HTTP 400.
+    from kubernetes.client.exceptions import ApiException
+
+    good = SimpleNamespace(metadata=SimpleNamespace(name="test-api-1"))
+    stuck = SimpleNamespace(metadata=SimpleNamespace(name="test-api-2"))
+    drift_setup.list_namespaced_pod.return_value = SimpleNamespace(items=[good, stuck])
+    drift_setup.read_namespaced_pod_log.side_effect = [
+        _prediction_log(40, sugar=4.0),
+        ApiException(status=400),
+    ]
+    result = execute_tool("check_prediction_drift", {}, "t19")
+    assert result["status"] == "ok"
+    assert result["data"]["pods_read"] == ["test-api-1"]
+    assert "test-api-2" in result["data"]["pods_skipped"]

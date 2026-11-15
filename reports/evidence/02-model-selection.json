@@ -1,13 +1,55 @@
 {
-  "request_id": "2c4ac9889ae6",
-  "answer": "## Comparison of the last five runs (experiment `wine-quality`)\n\nRanked by F1, newest first:\n\n| # | Run ID | Model | n_estimators | F1 | Quality gate | Data tag |\n|---|--------|-------|--------------|-----|--------------|----------|\n| 1 | `dd037273c28649d6a6b917bdfd2ebc12` | rf | 300 | **0.4951** | ✅ passed | data-v2 |\n| 2 | `90a2a26047954e8c88f5bb3731fce040` | rf | 100 | 0.4920 | ❌ failed | data-v2 |\n| 3 | `80655548427547dc83498398d8af75ee` | rf | 100 | 0.4920 | ✅ passed | data-v2 |\n| 4 | `9e7b5702d75e4e979ef79556ea5c7902` | rf | 100 | 0.4920 | ✅ passed | data-v2 |\n| 5 | `cd97c886fc9b40adb71ae86b6d2feab0` | logreg | — | 0.4098 | ❌ failed | data-v2 |\n\nAll five runs trained on the same dataset (`data-v2`, commit `2a6aa7d…`).\n\n## Best candidate based on F1\n\n**Run `dd037273c28649d6a6b917bdfd2ebc12`** — F1 = **0.4951**, the highest of the five, and it is the only run that both scores above the others *and* passed the quality gate. It differs from runs 3 and 4 (which tie at 0.4920) by using `n_estimators=300` instead of 100; runs 2 and 5 are lower-scoring or failed the gate.\n\n## Recommended action\n\nIf you want to promote a candidate, register run `dd037273c28649d6a6b917bdfd2ebc12` as a champion candidate — it is the top F1 (0.4951) and its quality gate passed on `data-v2`. I can look up the registry aliases for this model if you'd like to set that alias, but I won't change anything unless you ask.\n\nNote: none of these five runs clears a high bar — even the best is F1 ≈ 0.495. If production readiness matters more than relative ranking, consider whether retraining on newer data is warranted (I can check the pipeline status and data drift for that).",
+  "request_id": "ad3661dbbe4b",
+  "answer": "## Known facts\n- **Metric name:** The runs log the metric as `f1` (lowercase), not `F1`.\n- **Last five runs (newest first) and their F1:**\n  | Run ID | Start time | Model / n_estimators | train_rows | F1 | Quality gate |\n  |---|---|---|---|---|---|\n  | c52f21d3155f488ab33b38dc860ca0ea | 2026-11-15 17:38 | rf / 100 | 4254 | 0.4920 | passed |\n  | 4113ba5e5b8d4e8abae243983bf7b480 | 2026-11-15 16:42 | rf / 100 | 4254 | 0.4920 | passed |\n  | 90a2a26047954e8c88f5bb3731fce040 | 2026-11-15 16:05 | rf / 100 | 4254 | 0.4920 | **failed** |\n  | 80655548427547dc83498398d8af75ee | 2026-11-15 16:03 | rf / 100 | 4254 | 0.4920 | passed |\n  | dd037273c28649d6a6b917bdfd2ebc12 | 2026-11-13 17:05 | rf / **300** | 4254 | **0.4951** | passed |\n- **Best candidate by F1:** `dd037273c28649d6a6b917bdfd2ebc12` with **F1 = 0.4951**, which is the only run in the last five that used `n_estimators=300`. It also passed its quality gate and was trained on dataset version **data-v2** (commit `2a6aa7d…`, hash `3e3353d…`).\n- All five runs use the same data (`data-v2`) and the same model type (`rf`); only `n_estimators` differs. The F1 difference between the best run and the rest is small (0.4951 vs 0.4920).\n\n## Uncertainties\n- F1 alone does not mean production-ready. I did not check this run's other metrics (e.g. precision/recall), its deployment state, or whether live inputs have drifted — none of which change the F1 ranking but matter before promoting a model.\n- The best run is from 2026-11-13; the other four runs are from 2026-11-15 and tie on F1, so \"best by F1\" is unambiguous here, but the margin is narrow.\n\n## Recommended actions\n- **Recommended candidate:** run `dd037273c28649d6a6b917bdfd2ebc12` (F1 0.4951, quality gate passed, data-v2). It is the highest F1 among the last five runs and is the only one that cleared its gate with `n_estimators=300`.\n- If you want to promote it to a deployed alias, confirm first — I can then check prediction drift and the current deployed version before recommending a rollout. I will not trigger any pipeline or restart unless you ask.\n\nNote: these tool calls did not succeed, so their data is missing from this answer: get_best_run (error).",
   "evidence": [
     {
       "tool": "list_runs",
       "status": "ok",
       "data": {
-        "experiment": "wine-quality",
         "runs": [
+          {
+            "run_id": "c52f21d3155f488ab33b38dc860ca0ea",
+            "experiment_id": "1",
+            "status": "FINISHED",
+            "start_time": "2026-11-15T17:38:21.094000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "params": {
+              "model": "rf",
+              "n_estimators": "100",
+              "train_rows": "4254"
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "data_path": "data/raw/wine.csv",
+              "code_commit": "1837884fb5b0d73b498751ea77cb4c2cce6a1cd9",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "run_id": "4113ba5e5b8d4e8abae243983bf7b480",
+            "experiment_id": "1",
+            "status": "FINISHED",
+            "start_time": "2026-11-15T16:42:21.076000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "params": {
+              "model": "rf",
+              "n_estimators": "100",
+              "train_rows": "4254"
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "941754ebd5510bad68a77bf30efa603222c72a29",
+              "quality_gate": "passed"
+            }
+          },
           {
             "run_id": "90a2a26047954e8c88f5bb3731fce040",
             "experiment_id": "1",
@@ -21,11 +63,11 @@
               "n_estimators": "100",
               "train_rows": "4254"
             },
-            "tags": {
-              "data.md5": "3e3353d229ccbf42237c408206d69423",
-              "data.tag": "data-v2",
-              "data.commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-              "git.commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
               "quality_gate": "failed"
             }
           },
@@ -42,11 +84,11 @@
               "n_estimators": "100",
               "train_rows": "4254"
             },
-            "tags": {
-              "data.md5": "3e3353d229ccbf42237c408206d69423",
-              "data.tag": "data-v2",
-              "data.commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-              "git.commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
               "quality_gate": "passed"
             }
           },
@@ -63,60 +105,82 @@
               "n_estimators": "300",
               "train_rows": "4254"
             },
-            "tags": {
-              "data.md5": "3e3353d229ccbf42237c408206d69423",
-              "data.tag": "data-v2",
-              "data.commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-              "git.commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
               "quality_gate": "passed"
-            }
-          },
-          {
-            "run_id": "9e7b5702d75e4e979ef79556ea5c7902",
-            "experiment_id": "1",
-            "status": "FINISHED",
-            "start_time": "2026-11-13T17:05:27.844000+00:00",
-            "metrics": {
-              "f1": 0.49201277955271566
-            },
-            "params": {
-              "model": "rf",
-              "n_estimators": "100",
-              "train_rows": "4254"
-            },
-            "tags": {
-              "data.md5": "3e3353d229ccbf42237c408206d69423",
-              "data.tag": "data-v2",
-              "data.commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-              "git.commit": "b00cd5ecda00eaea314231755b04c118316392f4",
-              "quality_gate": "passed"
-            }
-          },
-          {
-            "run_id": "cd97c886fc9b40adb71ae86b6d2feab0",
-            "experiment_id": "1",
-            "status": "FINISHED",
-            "start_time": "2026-11-13T17:05:18.891000+00:00",
-            "metrics": {
-              "f1": 0.40978593272171254
-            },
-            "params": {
-              "model": "logreg",
-              "train_rows": "4254"
-            },
-            "tags": {
-              "data.md5": "3e3353d229ccbf42237c408206d69423",
-              "data.tag": "data-v2",
-              "data.commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-              "git.commit": "b00cd5ecda00eaea314231755b04c118316392f4",
-              "quality_gate": "failed"
             }
           }
         ]
       },
       "error": null,
-      "duration_ms": 131,
-      "request_id": "2c4ac9889ae6"
+      "duration_ms": 18,
+      "request_id": "ad3661dbbe4b"
+    },
+    {
+      "tool": "get_best_run",
+      "status": "error",
+      "data": null,
+      "error": "ValueError: no run has logged metric 'F1'; metrics logged: ['f1']",
+      "duration_ms": 61,
+      "request_id": "ad3661dbbe4b"
+    },
+    {
+      "tool": "get_best_run",
+      "status": "ok",
+      "data": {
+        "metric": "f1",
+        "best": {
+          "run_id": "dd037273c28649d6a6b917bdfd2ebc12",
+          "experiment_id": "1",
+          "status": "FINISHED",
+          "start_time": "2026-11-13T17:05:37.693000+00:00",
+          "metrics": {
+            "f1": 0.495114006514658
+          },
+          "params": {
+            "model": "rf",
+            "n_estimators": "300",
+            "train_rows": "4254"
+          },
+          "provenance": {
+            "data_hash": "3e3353d229ccbf42237c408206d69423",
+            "data_version": "data-v2",
+            "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+            "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+            "quality_gate": "passed"
+          }
+        },
+        "runner_up": {
+          "run_id": "c52f21d3155f488ab33b38dc860ca0ea",
+          "experiment_id": "1",
+          "status": "FINISHED",
+          "start_time": "2026-11-15T17:38:21.094000+00:00",
+          "metrics": {
+            "f1": 0.49201277955271566
+          },
+          "params": {
+            "model": "rf",
+            "n_estimators": "100",
+            "train_rows": "4254"
+          },
+          "provenance": {
+            "data_hash": "3e3353d229ccbf42237c408206d69423",
+            "data_version": "data-v2",
+            "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+            "data_path": "data/raw/wine.csv",
+            "code_commit": "1837884fb5b0d73b498751ea77cb4c2cce6a1cd9",
+            "quality_gate": "passed"
+          }
+        },
+        "runs_ranked": 9,
+        "runs_missing_metric": 0
+      },
+      "error": null,
+      "duration_ms": 64,
+      "request_id": "ad3661dbbe4b"
     }
   ],
   "pending_action_id": null

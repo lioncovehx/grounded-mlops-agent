@@ -1,68 +1,64 @@
 {
-  "request_id": "91d2fb9be781",
-  "answer": "## Known facts\n- **Drift check ran against the deployed champion model v4**, reading logs from both ready pods (`wine-api-6d58fd769f-gb6tk`, `...j2p9d`), 60 predictions, window since each Pod started. Source: `check_prediction_drift`.\n- **No drift detected** at the 0.5‑std threshold — no feature is flagged drifted. Source: `check_prediction_drift`.\n- Largest per‑feature mean shift is **chlorides at −0.20 std** (training 0.0567 → live 0.0493); every other feature is within ±0.20 std of its training mean. Source: `check_prediction_drift` (`features`).\n- **Good‑prediction share**: live 0.283 vs. the training label rate 0.19 — a gap, but this system has no true quality labels, so it is not an accuracy statement. Source: `check_prediction_drift` (`good_prediction_rate`, `limitation`).\n\n## Uncertainties\n- The check measures **input drift only**. It cannot confirm live model accuracy because there are no ground‑truth quality labels in this system. Source: `check_prediction_drift` (`limitation`).\n- Coverage is limited to predictions logged by the two pods since they started; it is not a full historical comparison. Source: `check_prediction_drift` (`pods_read`, `window`).\n- The training baseline used is **data‑v2** (commit `2a6aa7d…`), which matches the champion's training data — so the comparison is apples‑to‑apples on dataset version. Source: `check_prediction_drift` (`baseline`).\n\n## Recommended actions\n- **No retraining or deployment change is warranted on drift grounds.** Live inputs are statistically consistent with what model v4 was trained on, and no feature crosses the 0.5‑std threshold.\n- If you want to close the good‑prediction‑rate gap (live 0.283 vs training 0.19), that would require true quality labels — this tool cannot answer it.",
+  "request_id": "8cfc65db8eb5",
+  "answer": "## Known facts\n- **No input drift detected.** `check_prediction_drift` read both API Pods (`wine-quality-api-5b9dffd57c-htjv9`, `...zv5g9`) over the window since each Pod started, found 60 predictions, and used model version **6** (the deployed version) as the baseline against run `c52f21d3155f488ab33b38dc860ca0ea`.\n- Every feature's live mean sits within 0.5 std of its training mean, so none crossed the drift threshold: the largest shift is **chlorides at −0.21σ** (live 0.0493 vs training 0.0572) and **volatile_acidity at −0.17σ**. All flagged `drifted: false`.\n- **Positive-prediction rate is elevated:** live predictions are positive **28.3%** of the time versus a training label rate of **18.9%**. This is the one mismatch, but it is a *label-rate* difference, not an input-feature shift.\n\n## Uncertainties\n- The tool measures **input drift only** — it cannot tell you whether live predictions are actually more or less accurate, because that requires ground-truth labels, which aren't available here.\n- The positive-rate gap could be benign (e.g., a different slice of real traffic than the training set) or a signal worth watching; this check alone can't classify it.\n- Drift is measured against **Pod start time**, so it covers only the current deployment window, not all historical traffic.\n\n## Recommended actions\nNo retraining is indicated by input drift — the features match training well enough. If you want to understand the positive-rate gap, pull a sample of live predictions with their true labels and compare accuracy directly; otherwise, treat this as a monitor item rather than an action item.",
   "evidence": [
     {
       "tool": "check_prediction_drift",
       "status": "ok",
       "data": {
         "pods_read": [
-          "wine-api-6d58fd769f-gb6tk",
-          "wine-api-6d58fd769f-j2p9d"
+          "wine-quality-api-5b9dffd57c-htjv9",
+          "wine-quality-api-5b9dffd57c-zv5g9"
         ],
         "predictions_found": 60,
         "window": "since each Pod started, up to max_log_lines per Pod",
         "model_versions_seen": [
-          "4"
+          "6"
         ],
-        "champion_version": "4",
-        "baseline": {
-          "data_tag": "data-v2",
-          "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-          "rows": 5318
-        },
+        "deployed_version": "6",
+        "baseline_run": "c52f21d3155f488ab33b38dc860ca0ea",
         "threshold_std": 0.5,
         "drift_detected": false,
         "drifted_features": [],
         "features": {
           "fixed_acidity": {
-            "training_mean": 7.2155,
+            "training_mean": 7.2159,
             "live_mean": 7.1583,
             "shift_in_std": -0.04,
             "drifted": false
           },
           "volatile_acidity": {
-            "training_mean": 0.3442,
+            "training_mean": 0.3446,
             "live_mean": 0.3161,
             "shift_in_std": -0.17,
             "drifted": false
           },
           "citric_acid": {
-            "training_mean": 0.3185,
+            "training_mean": 0.32,
             "live_mean": 0.3335,
-            "shift_in_std": 0.1,
+            "shift_in_std": 0.09,
             "drifted": false
           },
           "residual_sugar": {
-            "training_mean": 5.0496,
+            "training_mean": 5.0801,
             "live_mean": 4.7708,
-            "shift_in_std": -0.06,
+            "shift_in_std": -0.07,
             "drifted": false
           },
           "chlorides": {
-            "training_mean": 0.0567,
+            "training_mean": 0.0572,
             "live_mean": 0.0493,
-            "shift_in_std": -0.2,
+            "shift_in_std": -0.21,
             "drifted": false
           },
           "free_sulfur_dioxide": {
-            "training_mean": 30.0305,
+            "training_mean": 29.9419,
             "live_mean": 28.8833,
             "shift_in_std": -0.06,
             "drifted": false
           },
           "total_sulfur_dioxide": {
-            "training_mean": 114.1077,
+            "training_mean": 114.0226,
             "live_mean": 116.35,
             "shift_in_std": 0.04,
             "drifted": false
@@ -74,33 +70,33 @@
             "drifted": false
           },
           "pH": {
-            "training_mean": 3.2246,
+            "training_mean": 3.2224,
             "live_mean": 3.2402,
-            "shift_in_std": 0.1,
+            "shift_in_std": 0.11,
             "drifted": false
           },
           "sulphates": {
-            "training_mean": 0.5334,
+            "training_mean": 0.5318,
             "live_mean": 0.522,
-            "shift_in_std": -0.08,
+            "shift_in_std": -0.07,
             "drifted": false
           },
           "alcohol": {
-            "training_mean": 10.5492,
+            "training_mean": 10.5385,
             "live_mean": 10.6872,
-            "shift_in_std": 0.12,
+            "shift_in_std": 0.13,
             "drifted": false
           }
         },
-        "good_prediction_rate": {
-          "live": 0.283,
-          "training_label_rate": 0.19
+        "positive_rate": {
+          "live_predictions": 0.283,
+          "training_labels": 0.18946873530794547
         },
-        "limitation": "input drift only; live accuracy needs true quality labels"
+        "limitation": "input drift only; live accuracy needs true labels"
       },
       "error": null,
-      "duration_ms": 893,
-      "request_id": "91d2fb9be781"
+      "duration_ms": 143,
+      "request_id": "8cfc65db8eb5"
     }
   ],
   "pending_action_id": null

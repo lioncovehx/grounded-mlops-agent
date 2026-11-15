@@ -1,26 +1,22 @@
 {
-  "request_id": "7c46dffbc2cb",
-  "answer": "## Known facts\n- **Input drift: detected.** `check_prediction_drift` read 120 predictions from the two ready `wine-api` Pods (champion model version **4**, trained on **data-v2**). One feature crossed the 0.5σ threshold:\n  - **residual_sugar**: training mean 5.05 → live mean 9.54, a **+1.0σ shift** (`drifted: true`). Every other feature is within threshold (largest is chlorides at −0.20σ).\n  - Proxy signal: live \"good\" prediction share is **0.283 vs 0.19** in training data — elevated, but this is a proxy only; the tool flags it as input drift, not confirmed accuracy loss.\n- **Data is unchanged.** `detect_data_changes`: workspace matches DVC pointers, no uncommitted pointer files, current tag **data-v2**.\n- **No newer dataset.** `get_retraining_signals`: `newer_data_available: false`; champion trained on md5 `3e3353d2…` which is identical to current data.\n- **Model is fresh and gated clean.** Champion v4, source run `80655548427547dc83498398d8af75ee`, F1 **0.492**, quality_gate **passed**, model age **0.0 days** (under the 30-day limit).\n- **Pipeline healthy.** Latest `training_pipeline` run `manual__2026-11-15T16:42:13…` finished **success**; all five tasks (`validate_dataset`, `preprocess`, `train`, `evaluate_and_log`, `quality_gate`) succeeded.\n\n## Uncertainties\n- We cannot confirm live accuracy degradation — this system has no true quality labels, so the elevated \"good\" rate is a proxy only.\n- The residual_sugar drift could be a real distribution shift in incoming wine, or a sampling artifact from only 120 predictions since Pod restart; the window is per-Pod-start and not a fixed calendar window.\n- Whether retraining would actually help depends on whether a new *labeled* dataset reflecting the higher residual_sugar exists — none is currently tagged.\n\n## Recommended actions\n- **Retraining is not indicated by staleness or data changes** (no newer data, model 0 days old, gate passed). The one genuine signal is the **residual_sugar input drift at +1.0σ**.\n- If you want to act on the drift: retraining would only help if there's a fresh labeled dataset capturing the shifted residual_sugar distribution — currently there isn't (data stays at data-v2). A retrain now would otherwise just reproduce v4 on identical data.\n- I have **not** triggered anything, since that needs your confirmation. If you'd like to pursue it, say so and I can: (a) list tagged dataset versions to check for a newer labeled set, and (b) trigger `training_pipeline` — but only with your explicit go-ahead.",
+  "request_id": "e7876c728bec",
+  "answer": "## Known facts\n- **Drift detected** (`check_prediction_drift`): live traffic has drifted from model v6's training data on one feature — **residual_sugar**, with a mean shift of **+0.99 training standard deviations** (training mean 5.08 vs live mean 9.54). All other features are within the 0.5σ threshold.\n- **Positive-prediction rate is elevated**: 28.3% of live predictions are positive vs 18.9% in the training labels — consistent with the residual_sugar shift pushing more inputs toward a positive outcome.\n- **Deployed model** (`get_deployed_version`): `wine-quality-api` is running `model-v6`, rollout complete, all 2 replicas ready (0 unavailable).\n- **Data is unchanged** (`detect_data_changes`): workspace matches its DVC pointers, no uncommitted pointer files, and the dataset sits at tag **data-v2**.\n- **The deployed model was trained on data-v2** (`get_retraining_signals`): recorded md5 `3e3353d229ccbf42237c408206d69423` matches the current data md5 — so v6 is in sync with today's committed data.\n- **No newer data** (`get_retraining_signals`): `newer_data_available: false`; nothing to ingest that isn't already deployed.\n- **Model is fresh**: age 0.0 days (limit 30).\n- **Quality gate passed** for the deployed alias, primary metric f1 ≈ 0.492.\n- **A training run failed** (`get_dag_run_status`, `training_pipeline`): run `manual__2026-11-15T17:45:23…` failed at task `validate_dataset`; `preprocess`, `train`, `evaluate_and_log` and `quality_gate` never ran (upstream_failed).\n\n## Uncertainties\n- **Live accuracy is unknown** — drift detection is input-only; there are no true labels in the logs, so I can't confirm predictions are actually wrong, only that inputs shifted.\n- **Why `validate_dataset` failed** is not yet established — its failure could be unrelated to the drift (a schema/schema-mismatch or threshold issue worth a `get_task_diagnostics` look before retraining).\n- **Whether residual_sugar drift is real distribution change vs. a data/labeling quirk** can't be confirmed from logs alone.\n\n## Recommended actions\n1. **Confirm the drift matters before retraining.** The residual_sugar shift (nearly 1σ) plus the higher positive rate are worth investigating, but since v6 already passed its quality gate and was trained on the current data-v2, this looks like a genuine input distribution change rather than model staleness.\n2. **Diagnose the failed pipeline** (`get_task_diagnostics` for `validate_dataset`) — a retraining attempt can't proceed until that task passes; it may be blocking any new training run regardless of drift.\n3. **Retrain only if you decide the shift degrades quality.** If you confirm degradation, I can trigger the project's training DAG — but that needs your explicit confirmation (it changes state). Note there is no newer data to ingest; a retrain would just refit on the existing data-v2, which already includes the drifted residual_sugar values.",
   "evidence": [
     {
       "tool": "check_prediction_drift",
       "status": "ok",
       "data": {
         "pods_read": [
-          "wine-api-6d58fd769f-gb6tk",
-          "wine-api-6d58fd769f-j2p9d"
+          "wine-quality-api-5b9dffd57c-htjv9",
+          "wine-quality-api-5b9dffd57c-zv5g9"
         ],
         "predictions_found": 120,
         "window": "since each Pod started, up to max_log_lines per Pod",
         "model_versions_seen": [
-          "4"
+          "6"
         ],
-        "champion_version": "4",
-        "baseline": {
-          "data_tag": "data-v2",
-          "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
-          "rows": 5318
-        },
+        "deployed_version": "6",
+        "baseline_run": "c52f21d3155f488ab33b38dc860ca0ea",
         "threshold_std": 0.5,
         "drift_detected": true,
         "drifted_features": [
@@ -28,43 +24,43 @@
         ],
         "features": {
           "fixed_acidity": {
-            "training_mean": 7.2155,
+            "training_mean": 7.2159,
             "live_mean": 7.1583,
             "shift_in_std": -0.04,
             "drifted": false
           },
           "volatile_acidity": {
-            "training_mean": 0.3442,
+            "training_mean": 0.3446,
             "live_mean": 0.3161,
             "shift_in_std": -0.17,
             "drifted": false
           },
           "citric_acid": {
-            "training_mean": 0.3185,
+            "training_mean": 0.32,
             "live_mean": 0.3335,
-            "shift_in_std": 0.1,
+            "shift_in_std": 0.09,
             "drifted": false
           },
           "residual_sugar": {
-            "training_mean": 5.0496,
+            "training_mean": 5.0801,
             "live_mean": 9.5417,
-            "shift_in_std": 1.0,
+            "shift_in_std": 0.99,
             "drifted": true
           },
           "chlorides": {
-            "training_mean": 0.0567,
+            "training_mean": 0.0572,
             "live_mean": 0.0493,
-            "shift_in_std": -0.2,
+            "shift_in_std": -0.21,
             "drifted": false
           },
           "free_sulfur_dioxide": {
-            "training_mean": 30.0305,
+            "training_mean": 29.9419,
             "live_mean": 28.8833,
             "shift_in_std": -0.06,
             "drifted": false
           },
           "total_sulfur_dioxide": {
-            "training_mean": 114.1077,
+            "training_mean": 114.0226,
             "live_mean": 116.35,
             "shift_in_std": 0.04,
             "drifted": false
@@ -76,85 +72,53 @@
             "drifted": false
           },
           "pH": {
-            "training_mean": 3.2246,
+            "training_mean": 3.2224,
             "live_mean": 3.2402,
-            "shift_in_std": 0.1,
+            "shift_in_std": 0.11,
             "drifted": false
           },
           "sulphates": {
-            "training_mean": 0.5334,
+            "training_mean": 0.5318,
             "live_mean": 0.522,
-            "shift_in_std": -0.08,
+            "shift_in_std": -0.07,
             "drifted": false
           },
           "alcohol": {
-            "training_mean": 10.5492,
+            "training_mean": 10.5385,
             "live_mean": 10.6872,
-            "shift_in_std": 0.12,
+            "shift_in_std": 0.13,
             "drifted": false
           }
         },
-        "good_prediction_rate": {
-          "live": 0.283,
-          "training_label_rate": 0.19
+        "positive_rate": {
+          "live_predictions": 0.283,
+          "training_labels": 0.18946873530794547
         },
-        "limitation": "input drift only; live accuracy needs true quality labels"
+        "limitation": "input drift only; live accuracy needs true labels"
       },
       "error": null,
-      "duration_ms": 26,
-      "request_id": "7c46dffbc2cb"
+      "duration_ms": 341,
+      "request_id": "e7876c728bec"
     },
     {
-      "tool": "get_dag_run_status",
+      "tool": "get_deployed_version",
       "status": "ok",
       "data": {
-        "dag_id": "training_pipeline",
-        "dag_run_id": "manual__2026-11-15T16:42:13.517323+00:00",
-        "state": "success",
-        "run_type": "manual",
-        "start_date": "2026-11-15T16:42:14.190565Z",
-        "end_date": "2026-11-15T16:42:28.805257Z",
-        "tasks": [
-          {
-            "task_id": "validate_dataset",
-            "state": "success",
-            "try_number": 1,
-            "start_date": "2026-11-15T16:42:14.235404Z",
-            "end_date": "2026-11-15T16:42:16.674586Z"
-          },
-          {
-            "task_id": "preprocess",
-            "state": "success",
-            "try_number": 1,
-            "start_date": "2026-11-15T16:42:17.733095Z",
-            "end_date": "2026-11-15T16:42:19.064873Z"
-          },
-          {
-            "task_id": "train",
-            "state": "success",
-            "try_number": 1,
-            "start_date": "2026-11-15T16:42:19.862466Z",
-            "end_date": "2026-11-15T16:42:24.095545Z"
-          },
-          {
-            "task_id": "evaluate_and_log",
-            "state": "success",
-            "try_number": 1,
-            "start_date": "2026-11-15T16:42:24.304815Z",
-            "end_date": "2026-11-15T16:42:25.911787Z"
-          },
-          {
-            "task_id": "quality_gate",
-            "state": "success",
-            "try_number": 1,
-            "start_date": "2026-11-15T16:42:26.433648Z",
-            "end_date": "2026-11-15T16:42:28.348636Z"
-          }
-        ]
+        "name": "wine-quality-api",
+        "desired": 2,
+        "ready": 2,
+        "available": 2,
+        "updated": 2,
+        "unavailable": 0,
+        "images": [
+          "wine-quality-api:model-v6"
+        ],
+        "model_version": "6",
+        "rollout_complete": true
       },
       "error": null,
-      "duration_ms": 170,
-      "request_id": "7c46dffbc2cb"
+      "duration_ms": 8,
+      "request_id": "e7876c728bec"
     },
     {
       "tool": "detect_data_changes",
@@ -163,38 +127,96 @@
         "dvc_status": {},
         "workspace_matches_pointers": true,
         "uncommitted_pointer_files": [],
-        "current_data_tag": "data-v2"
+        "current_version_tags": {
+          "data/raw/wine.csv": "data-v2"
+        }
       },
       "error": null,
-      "duration_ms": 284,
-      "request_id": "7c46dffbc2cb"
+      "duration_ms": 309,
+      "request_id": "e7876c728bec"
+    },
+    {
+      "tool": "get_dag_run_status",
+      "status": "ok",
+      "data": {
+        "dag_id": "training_pipeline",
+        "dag_run_id": "manual__2026-11-15T17:45:23.592222+00:00",
+        "state": "failed",
+        "run_type": "manual",
+        "start_date": "2026-11-15T17:45:23.717549Z",
+        "end_date": "2026-11-15T17:45:28.759324Z",
+        "tasks": [
+          {
+            "task_id": "validate_dataset",
+            "state": "failed",
+            "try_number": 1,
+            "start_date": "2026-11-15T17:45:23.762976Z",
+            "end_date": "2026-11-15T17:45:25.046360Z"
+          },
+          {
+            "task_id": "preprocess",
+            "state": "upstream_failed",
+            "try_number": 0,
+            "start_date": "2026-11-15T17:45:25.252052Z",
+            "end_date": "2026-11-15T17:45:25.252052Z"
+          },
+          {
+            "task_id": "train",
+            "state": "upstream_failed",
+            "try_number": 0,
+            "start_date": "2026-11-15T17:45:26.310746Z",
+            "end_date": "2026-11-15T17:45:26.310746Z"
+          },
+          {
+            "task_id": "evaluate_and_log",
+            "state": "upstream_failed",
+            "try_number": 0,
+            "start_date": "2026-11-15T17:45:27.350680Z",
+            "end_date": "2026-11-15T17:45:27.350680Z"
+          },
+          {
+            "task_id": "quality_gate",
+            "state": "upstream_failed",
+            "try_number": 0,
+            "start_date": "2026-11-15T17:45:27.720830Z",
+            "end_date": "2026-11-15T17:45:27.720830Z"
+          }
+        ]
+      },
+      "error": null,
+      "duration_ms": 75,
+      "request_id": "e7876c728bec"
     },
     {
       "tool": "get_retraining_signals",
       "status": "ok",
       "data": {
         "model": "wine-quality",
-        "champion_version": "4",
-        "source_run": "80655548427547dc83498398d8af75ee",
+        "deployed_alias": "champion",
+        "deployed_version": "6",
+        "source_run": "c52f21d3155f488ab33b38dc860ca0ea",
+        "dataset": "data/raw/wine.csv",
         "trained_on": {
           "md5": "3e3353d229ccbf42237c408206d69423",
-          "data_tag": "data-v2"
+          "version_tag": "data-v2"
         },
         "current_data": {
           "md5": "3e3353d229ccbf42237c408206d69423",
-          "data_tag": "data-v2"
+          "version_tag": "data-v2"
         },
         "newer_data_available": false,
         "model_age_days": 0.0,
         "max_age_days": 30,
         "too_old": false,
         "quality_gate": "passed",
-        "f1": 0.49201277955271566,
+        "metrics": {
+          "f1": 0.49201277955271566
+        },
         "degradation_evidence": "not checked here: call check_prediction_drift for input drift; live accuracy needs true labels, which the system does not have"
       },
       "error": null,
-      "duration_ms": 21,
-      "request_id": "7c46dffbc2cb"
+      "duration_ms": 19,
+      "request_id": "e7876c728bec"
     }
   ],
   "pending_action_id": null

@@ -1,81 +1,94 @@
 {
-  "request_id": "916a29797c4d",
-  "answer": "## Known facts\n- **Deployment `wine-api` is healthy.** `list_workloads` shows 2 desired replicas, 2 ready, 2 available, 0 unavailable; image `wine-api:0.1.0`, model_version `4`.\n- **Both Pods are Running and Ready.** `wine-api-66dc547b48-pndtn` and `wine-api-66dc547b48-sf4xq`: phase Running, ready true, restart_count 0, no waiting reason or termination reason (from `list_workloads`).\n- **Service routes correctly.** `inspect_services` shows the `wine-api` ClusterIP service (port 80 → target 8000) matching 2 Pods and routing to 2 ready Pods.\n- **Rollout complete.** `get_deployed_version` confirms rollout_complete true, desired=ready=available=updated=2, unavailable=0.\n- **No unhealthy Pods right now.** `find_unhealthy_pods` returned an empty list (0 of 2 pods unhealthy).\n\n## Uncertainties\n- These tools confirm container/Pod/service readiness and rollout state, but do not report application-level latency or request success rates. So \"healthy\" here means the deployment is up and ready, not that endpoints are currently serving responses without errors.\n- The warning events in `find_unhealthy_pods` belong to a **past** Pod (`wine-api-646bf5746f-v68lv`) that failed to pull image `wine-api:0.2.0` — pull access denied / \"repository does not exist or may require authorization,\" with ImagePullBackOff (last seen 2026-11-15 16:39). That rollout never completed and is **not** the current state; today's deployment runs `wine-api:0.1.0`. It remains a latent risk if someone later tries to deploy `0.2.0` (the image appears to be missing or not authorized in the registry).\n\n## Recommended actions\n- No action needed for the live API — it is running, ready and fully rolled out on `wine-api:0.1.0` / model version 4.\n- If you intend to deploy `wine-api:0.2.0`, confirm the image exists in the registry and is authorized before restarting; otherwise that rollout will repeat the ImagePullBackOff failure seen earlier. I won't restart anything unless you ask.",
+  "request_id": "4aab55734699",
+  "answer": "## Known facts\n- **Deployment `wine-quality-api`**: 2/2 desired replicas ready and available, 0 unavailable (tool `list_workloads`).\n- **Pods**: both (`...-htjv9`, `...-zv5g9`) phase Running, ready, 0 restarts, no waiting reason or termination reason (tool `list_workloads`).\n- **Unhealthy pods check**: 2 pods checked, 0 unhealthy, 0 warning events (tool `find_unhealthy_pods`).\n- **Service `wine-quality-api`**: ClusterIP on port 80 → target port `http`, matching 2 pods, all 2 ready (tool `inspect_services`).\n- **Deployed version**: image `docker.io/library/wine-quality-api:model-v6`, model version **6**, rollout complete (tool `get_deployed_version`).\n- **Prediction drift** (60 predictions read from both pods since each started): no feature drifted beyond 0.5σ — largest shift is chlorides at −0.21σ; every feature flagged `drifted: false` (tool `check_prediction_drift`).\n\n## Uncertainties\n- Drift check covers **input** drift only, based on 60 logged predictions since each Pod started — a small sample and no window length reported. It cannot confirm live accuracy because it has no true labels (per the tool's own limitation).\n- The **positive-prediction rate is 0.283 live vs 0.189 in training** (~50% higher). This is an output/label-rate gap, not input drift, so it isn't flagged as drift — but it's a discrepancy worth watching; it could mean the model is predicting positives more often than it did on training data. It does not prove a fault, only that the live label distribution differs from training.\n- No tool result shows end‑to‑end request success/error rates or latency, so \"healthy\" here reflects readiness and stability, not measured prediction correctness.\n\n## Recommended actions\nNo action needed to keep the API running — it is ready, stable (no restarts) and serving model v6 with no input drift. If you want to close the remaining gap, I can pull recent pod logs (`get_pod_status_and_logs`) to look for request errors or latency, and/or dig into MLflow runs to compare whether model v6's quality gate passed and what data it was trained on.",
   "evidence": [
     {
       "tool": "list_workloads",
       "status": "ok",
       "data": {
-        "namespace": "mlops-app",
+        "namespace": "wine-quality",
         "deployments": [
           {
-            "name": "wine-api",
+            "name": "wine-quality-api",
             "desired": 2,
             "ready": 2,
             "available": 2,
             "updated": 2,
             "unavailable": 0,
             "images": [
-              "wine-api:0.1.0"
+              "wine-quality-api:model-v6"
             ],
-            "model_version": "4"
+            "model_version": "6"
           }
         ],
         "pods": [
           {
-            "name": "wine-api-66dc547b48-pndtn",
+            "name": "wine-quality-api-5b9dffd57c-htjv9",
             "phase": "Running",
             "ready": true,
             "restarts": 0,
             "containers": [
               {
-                "name": "wine-api",
+                "name": "api",
                 "ready": true,
                 "restart_count": 0,
                 "waiting_reason": null,
                 "last_termination_reason": null,
-                "image": "docker.io/library/wine-api:0.1.0"
+                "image": "docker.io/library/wine-quality-api:model-v6"
               }
             ]
           },
           {
-            "name": "wine-api-66dc547b48-sf4xq",
+            "name": "wine-quality-api-5b9dffd57c-zv5g9",
             "phase": "Running",
             "ready": true,
             "restarts": 0,
             "containers": [
               {
-                "name": "wine-api",
+                "name": "api",
                 "ready": true,
                 "restart_count": 0,
                 "waiting_reason": null,
                 "last_termination_reason": null,
-                "image": "docker.io/library/wine-api:0.1.0"
+                "image": "docker.io/library/wine-quality-api:model-v6"
               }
             ]
           }
         ]
       },
       "error": null,
-      "duration_ms": 333,
-      "request_id": "916a29797c4d"
+      "duration_ms": 358,
+      "request_id": "4aab55734699"
+    },
+    {
+      "tool": "find_unhealthy_pods",
+      "status": "ok",
+      "data": {
+        "namespace": "wine-quality",
+        "pods_checked": 2,
+        "unhealthy": [],
+        "warning_events": []
+      },
+      "error": null,
+      "duration_ms": 7,
+      "request_id": "4aab55734699"
     },
     {
       "tool": "inspect_services",
       "status": "ok",
       "data": {
-        "namespace": "mlops-app",
+        "namespace": "wine-quality",
         "services": [
           {
-            "name": "wine-api",
+            "name": "wine-quality-api",
             "type": "ClusterIP",
             "selector": {
-              "app": "wine-api"
+              "app.kubernetes.io/name": "wine-quality-api"
             },
             "ports": [
               {
                 "port": 80,
-                "target_port": "8000"
+                "target_port": "http"
               }
             ],
             "matching_pods": 2,
@@ -85,62 +98,123 @@
       },
       "error": null,
       "duration_ms": 7,
-      "request_id": "916a29797c4d"
-    },
-    {
-      "tool": "find_unhealthy_pods",
-      "status": "ok",
-      "data": {
-        "namespace": "mlops-app",
-        "pods_checked": 2,
-        "unhealthy": [],
-        "warning_events": [
-          {
-            "object": "Pod/wine-api-646bf5746f-v68lv",
-            "reason": "Failed",
-            "message": "Failed to pull image \"wine-api:0.2.0\": failed to pull and unpack image \"docker.io/library/wine-api:0.2.0\": failed to resolve reference \"docker.io/library/wine-api:0.2.0\": pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization fai",
-            "count": 3,
-            "last_seen": "2026-11-15 16:38:52+00:00"
-          },
-          {
-            "object": "Pod/wine-api-646bf5746f-v68lv",
-            "reason": "Failed",
-            "message": "Error: ErrImagePull",
-            "count": 3,
-            "last_seen": "2026-11-15 16:38:52+00:00"
-          },
-          {
-            "object": "Pod/wine-api-646bf5746f-v68lv",
-            "reason": "Failed",
-            "message": "Error: ImagePullBackOff",
-            "count": 3,
-            "last_seen": "2026-11-15 16:39:07+00:00"
-          }
-        ]
-      },
-      "error": null,
-      "duration_ms": 8,
-      "request_id": "916a29797c4d"
+      "request_id": "4aab55734699"
     },
     {
       "tool": "get_deployed_version",
       "status": "ok",
       "data": {
-        "name": "wine-api",
+        "name": "wine-quality-api",
         "desired": 2,
         "ready": 2,
         "available": 2,
         "updated": 2,
         "unavailable": 0,
         "images": [
-          "wine-api:0.1.0"
+          "wine-quality-api:model-v6"
         ],
-        "model_version": "4",
+        "model_version": "6",
         "rollout_complete": true
       },
       "error": null,
-      "duration_ms": 14,
-      "request_id": "916a29797c4d"
+      "duration_ms": 5,
+      "request_id": "4aab55734699"
+    },
+    {
+      "tool": "check_prediction_drift",
+      "status": "ok",
+      "data": {
+        "pods_read": [
+          "wine-quality-api-5b9dffd57c-htjv9",
+          "wine-quality-api-5b9dffd57c-zv5g9"
+        ],
+        "predictions_found": 60,
+        "window": "since each Pod started, up to max_log_lines per Pod",
+        "model_versions_seen": [
+          "6"
+        ],
+        "deployed_version": "6",
+        "baseline_run": "c52f21d3155f488ab33b38dc860ca0ea",
+        "threshold_std": 0.5,
+        "drift_detected": false,
+        "drifted_features": [],
+        "features": {
+          "fixed_acidity": {
+            "training_mean": 7.2159,
+            "live_mean": 7.1583,
+            "shift_in_std": -0.04,
+            "drifted": false
+          },
+          "volatile_acidity": {
+            "training_mean": 0.3446,
+            "live_mean": 0.3161,
+            "shift_in_std": -0.17,
+            "drifted": false
+          },
+          "citric_acid": {
+            "training_mean": 0.32,
+            "live_mean": 0.3335,
+            "shift_in_std": 0.09,
+            "drifted": false
+          },
+          "residual_sugar": {
+            "training_mean": 5.0801,
+            "live_mean": 4.7708,
+            "shift_in_std": -0.07,
+            "drifted": false
+          },
+          "chlorides": {
+            "training_mean": 0.0572,
+            "live_mean": 0.0493,
+            "shift_in_std": -0.21,
+            "drifted": false
+          },
+          "free_sulfur_dioxide": {
+            "training_mean": 29.9419,
+            "live_mean": 28.8833,
+            "shift_in_std": -0.06,
+            "drifted": false
+          },
+          "total_sulfur_dioxide": {
+            "training_mean": 114.0226,
+            "live_mean": 116.35,
+            "shift_in_std": 0.04,
+            "drifted": false
+          },
+          "density": {
+            "training_mean": 0.9945,
+            "live_mean": 0.9942,
+            "shift_in_std": -0.13,
+            "drifted": false
+          },
+          "pH": {
+            "training_mean": 3.2224,
+            "live_mean": 3.2402,
+            "shift_in_std": 0.11,
+            "drifted": false
+          },
+          "sulphates": {
+            "training_mean": 0.5318,
+            "live_mean": 0.522,
+            "shift_in_std": -0.07,
+            "drifted": false
+          },
+          "alcohol": {
+            "training_mean": 10.5385,
+            "live_mean": 10.6872,
+            "shift_in_std": 0.13,
+            "drifted": false
+          }
+        },
+        "positive_rate": {
+          "live_predictions": 0.283,
+          "training_labels": 0.18946873530794547
+        },
+        "limitation": "input drift only; live accuracy needs true labels"
+      },
+      "error": null,
+      "duration_ms": 163,
+      "request_id": "4aab55734699"
     }
   ],
   "pending_action_id": null

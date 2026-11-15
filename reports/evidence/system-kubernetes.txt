@@ -1,31 +1,39 @@
-$ kubectl -n mlops-app get deploy,pods,svc,configmap -o wide
-NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES           SELECTOR
-deployment.apps/wine-api   2/2     2            2           59m   wine-api     wine-api:0.1.1   app=wine-api
+$ kubectl -n wine-quality get deploy,pods,svc,configmap,serviceaccount
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/wine-quality-api   2/2     2            2           9m58s
 
-NAME                            READY   STATUS    RESTARTS   AGE    IP           NODE    NOMINATED NODE   READINESS GATES
-pod/wine-api-6d58fd769f-gb6tk   1/1     Running   0          2m5s   10.244.0.8   mlops   <none>           <none>
-pod/wine-api-6d58fd769f-j2p9d   1/1     Running   0          2m     10.244.0.9   mlops   <none>           <none>
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/wine-quality-api-6d59dcc84d-7bgds   1/1     Running   0          99s
+pod/wine-quality-api-6d59dcc84d-bm67n   1/1     Running   0          105s
 
-NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
-service/wine-api   ClusterIP   10.99.26.167   <none>        80/TCP    59m   app=wine-api
+NAME                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+service/wine-quality-api   ClusterIP   10.100.37.102   <none>        80/TCP    9m58s
 
-NAME                         DATA   AGE
-configmap/kube-root-ca.crt   1      59m
-configmap/wine-api-config    1      59m
+NAME                                DATA   AGE
+configmap/kube-root-ca.crt          1      9m58s
+configmap/wine-quality-api-config   1      9m58s
 
-$ kubectl -n mlops-app rollout history deployment/wine-api
-deployment.apps/wine-api 
+NAME                         AGE
+serviceaccount/default       9m58s
+serviceaccount/mlops-agent   9m58s
+
+$ kubectl -n wine-quality get pods --show-labels
+NAME                                READY   STATUS    RESTARTS   AGE    LABELS
+wine-quality-api-6d59dcc84d-7bgds   1/1     Running   0          99s    app.kubernetes.io/component=inference,app.kubernetes.io/name=wine-quality-api,app.kubernetes.io/version=model-v6,mlops/model-version=6,pod-template-hash=6d59dcc84d
+wine-quality-api-6d59dcc84d-bm67n   1/1     Running   0          105s   app.kubernetes.io/component=inference,app.kubernetes.io/name=wine-quality-api,app.kubernetes.io/version=model-v6,mlops/model-version=6,pod-template-hash=6d59dcc84d
+
+$ kubectl -n wine-quality rollout history deployment/wine-quality-api
+deployment.apps/wine-quality-api 
 REVISION  CHANGE-CAUSE
 1         <none>
 3         <none>
 4         <none>
-5         <none>
 
 
-# agent ServiceAccount permissions
-can-i list pods -n mlops-app: yes
-can-i get pods/log -n mlops-app: yes
-can-i patch deployments -n mlops-app: yes
-can-i delete pods -n mlops-app: no
-can-i list secrets -n mlops-app: no
+# mlops-agent ServiceAccount permissions
+can-i list pods -n wine-quality: yes
+can-i get pods/log -n wine-quality: yes
+can-i patch deployments -n wine-quality: yes
+can-i delete pods -n wine-quality: no
+can-i list secrets -n wine-quality: no
 can-i list pods -n kube-system: no

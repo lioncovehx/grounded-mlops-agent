@@ -1,5 +1,5 @@
 {
-  "request_id": "a2cfc943ffaa",
+  "request_id": "2639e262510a",
   "answer": "Confirmed trigger_dag: done.",
   "evidence": [
     {
@@ -7,13 +7,13 @@
       "status": "ok",
       "data": {
         "dag_id": "training_pipeline",
-        "dag_run_id": "manual__2026-11-15T16:42:13.517323+00:00",
+        "dag_run_id": "manual__2026-11-15T17:44:32.476939+00:00",
         "state": "queued",
         "warning": null
       },
       "error": null,
-      "duration_ms": 146,
-      "request_id": "a2cfc943ffaa"
+      "duration_ms": 63,
+      "request_id": "2639e262510a"
     }
   ],
   "pending_action_id": null

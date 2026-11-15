@@ -1,58 +1,58 @@
 {
-  "request_id": "a8abec56ea43",
-  "answer": "## Known facts\n- **Latest pipeline run succeeded.** `get_dag_run_status` (training_pipeline) shows run `manual__2026-11-15T16:42:13.517323+00:00` with state `success`; every task passed, including `quality_gate`.\n- **The model was not promoted.** `get_registry_info` (wine-quality) shows the champion is still version 4 (`80655548427547dc83498398d8af75ee`, F1 0.4920, data-v2). The latest run registered a new **candidate** version 5 (`4113ba5e5b8d4e8abae243983bf7b480`, F1 0.4920, data-v2), created at 2026-11-15T16:42:27.\n\n## Uncertainties\n- Nothing uncertain from the tools used — both returned complete data. No further checks were needed for this question.\n\n## Recommended actions\n- The latest run passed its quality gate, but it was **not** promoted to champion; version 4 remains champion and the new model sits as candidate (version 5). If you want version 5 to become champion, confirm and I can trigger a deployment rollout — otherwise leave it as-is.",
+  "request_id": "06032f67539d",
+  "answer": "## Known facts\n- **Latest `training_pipeline` run succeeded.** From `get_dag_run_status` (latest run `manual__2026-11-15T17:44:32`, state `success`): all five tasks passed — `validate_dataset`, `preprocess`, `train`, `evaluate_and_log`, and `quality_gate`.\n- **Its model was registered but not promoted to champion.** From `get_registry_info`: the run produced registry version **7**, which received the new **`candidate`** alias (f1 = 0.4920, data-v2, quality gate `passed`). The **`champion`** alias is still held by **version 6**.\n- **No re-deployment happened.** From `get_retraining_signals`: the deployed alias is still `champion` → version 6 (source run `c52f21d3155f488ab33b38dc860ca0ea`). Version 7 has not been rolled out.\n\n## Uncertainties\n- Whether promotion to champion was *intended* — the pipeline registered version 7 as candidate and passed its gate, but nothing in the tools shows a champion swap or a deployment restart for it.\n- Whether version 7 would actually beat the champion on live performance; f1 is identical (0.4920) between versions 6 and 7, so there's no metric-driven reason to promote it yet.\n\n## Recommended actions\n- If you want version 7 to become production-ready, confirm that I should **promote `candidate` (v7) to `champion`** — that is a change to the registry/deployment and needs your explicit confirmation before I act.",
   "evidence": [
     {
       "tool": "get_dag_run_status",
       "status": "ok",
       "data": {
         "dag_id": "training_pipeline",
-        "dag_run_id": "manual__2026-11-15T16:42:13.517323+00:00",
+        "dag_run_id": "manual__2026-11-15T17:44:32.476939+00:00",
         "state": "success",
         "run_type": "manual",
-        "start_date": "2026-11-15T16:42:14.190565Z",
-        "end_date": "2026-11-15T16:42:28.805257Z",
+        "start_date": "2026-11-15T17:44:33.321431Z",
+        "end_date": "2026-11-15T17:44:47.432988Z",
         "tasks": [
           {
             "task_id": "validate_dataset",
             "state": "success",
             "try_number": 1,
-            "start_date": "2026-11-15T16:42:14.235404Z",
-            "end_date": "2026-11-15T16:42:16.674586Z"
+            "start_date": "2026-11-15T17:44:33.360527Z",
+            "end_date": "2026-11-15T17:44:35.896800Z"
           },
           {
             "task_id": "preprocess",
             "state": "success",
             "try_number": 1,
-            "start_date": "2026-11-15T16:42:17.733095Z",
-            "end_date": "2026-11-15T16:42:19.064873Z"
+            "start_date": "2026-11-15T17:44:36.528395Z",
+            "end_date": "2026-11-15T17:44:37.804675Z"
           },
           {
             "task_id": "train",
             "state": "success",
             "try_number": 1,
-            "start_date": "2026-11-15T16:42:19.862466Z",
-            "end_date": "2026-11-15T16:42:24.095545Z"
+            "start_date": "2026-11-15T17:44:38.417405Z",
+            "end_date": "2026-11-15T17:44:42.590512Z"
           },
           {
             "task_id": "evaluate_and_log",
             "state": "success",
             "try_number": 1,
-            "start_date": "2026-11-15T16:42:24.304815Z",
-            "end_date": "2026-11-15T16:42:25.911787Z"
+            "start_date": "2026-11-15T17:44:43.460027Z",
+            "end_date": "2026-11-15T17:44:44.994485Z"
           },
           {
             "task_id": "quality_gate",
             "state": "success",
             "try_number": 1,
-            "start_date": "2026-11-15T16:42:26.433648Z",
-            "end_date": "2026-11-15T16:42:28.348636Z"
+            "start_date": "2026-11-15T17:44:45.592357Z",
+            "end_date": "2026-11-15T17:44:47.364627Z"
           }
         ]
       },
       "error": null,
-      "duration_ms": 70,
-      "request_id": "a8abec56ea43"
+      "duration_ms": 75,
+      "request_id": "06032f67539d"
     },
     {
       "tool": "get_registry_info",
@@ -60,59 +60,164 @@
       "data": {
         "model": "wine-quality",
         "aliases": {
-          "candidate": "5",
-          "champion": "4"
+          "candidate": "7",
+          "champion": "6"
         },
         "versions": [
           {
-            "version": "5",
+            "version": "7",
             "aliases": [
               "candidate"
             ],
-            "source_run": "4113ba5e5b8d4e8abae243983bf7b480",
-            "created": "2026-11-15T16:42:27.649000+00:00",
-            "f1": 0.49201277955271566,
-            "data_tag": "data-v2"
+            "source_run": "8802379c1b7b4154ba49a52ff253cd47",
+            "created": "2026-11-15T17:44:46.777000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "data_path": "data/raw/wine.csv",
+              "code_commit": "d5d1f9d2cb2bb89d58efcdd899409b9cdefec3d3",
+              "quality_gate": "passed"
+            }
           },
           {
-            "version": "4",
+            "version": "6",
             "aliases": [
               "champion"
             ],
+            "source_run": "c52f21d3155f488ab33b38dc860ca0ea",
+            "created": "2026-11-15T17:38:28.433000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "data_path": "data/raw/wine.csv",
+              "code_commit": "1837884fb5b0d73b498751ea77cb4c2cce6a1cd9",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "5",
+            "aliases": [],
+            "source_run": "4113ba5e5b8d4e8abae243983bf7b480",
+            "created": "2026-11-15T16:42:27.649000+00:00",
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "941754ebd5510bad68a77bf30efa603222c72a29",
+              "quality_gate": "passed"
+            }
+          },
+          {
+            "version": "4",
+            "aliases": [],
             "source_run": "80655548427547dc83498398d8af75ee",
             "created": "2026-11-15T16:03:55.070000+00:00",
-            "f1": 0.49201277955271566,
-            "data_tag": "data-v2"
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
           },
           {
             "version": "3",
             "aliases": [],
             "source_run": "dd037273c28649d6a6b917bdfd2ebc12",
             "created": "2026-11-13T17:05:43.671000+00:00",
-            "f1": 0.495114006514658,
-            "data_tag": "data-v2"
+            "metrics": {
+              "f1": 0.495114006514658
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
           },
           {
             "version": "2",
             "aliases": [],
             "source_run": "9e7b5702d75e4e979ef79556ea5c7902",
             "created": "2026-11-13T17:05:33.248000+00:00",
-            "f1": 0.49201277955271566,
-            "data_tag": "data-v2"
+            "metrics": {
+              "f1": 0.49201277955271566
+            },
+            "provenance": {
+              "data_hash": "3e3353d229ccbf42237c408206d69423",
+              "data_version": "data-v2",
+              "data_commit": "2a6aa7d488916d499cb48d694519d71c995893fc",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
           },
           {
             "version": "1",
             "aliases": [],
             "source_run": "8da2c720fcb24105a074a300bf94a90b",
             "created": "2026-11-13T17:05:14.224000+00:00",
-            "f1": 0.4727272727272727,
-            "data_tag": "data-v1"
+            "metrics": {
+              "f1": 0.4727272727272727
+            },
+            "provenance": {
+              "data_hash": "7d814a1bda02145efe703f4e1c01847a",
+              "data_version": "data-v1",
+              "data_commit": "f4f2bf155225a4944f10806db16880a4d8c7d706",
+              "code_commit": "b00cd5ecda00eaea314231755b04c118316392f4",
+              "quality_gate": "passed"
+            }
           }
         ]
       },
       "error": null,
-      "duration_ms": 51,
-      "request_id": "a8abec56ea43"
+      "duration_ms": 135,
+      "request_id": "06032f67539d"
+    },
+    {
+      "tool": "get_retraining_signals",
+      "status": "ok",
+      "data": {
+        "model": "wine-quality",
+        "deployed_alias": "champion",
+        "deployed_version": "6",
+        "source_run": "c52f21d3155f488ab33b38dc860ca0ea",
+        "dataset": "data/raw/wine.csv",
+        "trained_on": {
+          "md5": "3e3353d229ccbf42237c408206d69423",
+          "version_tag": "data-v2"
+        },
+        "current_data": {
+          "md5": "3e3353d229ccbf42237c408206d69423",
+          "version_tag": "data-v2"
+        },
+        "newer_data_available": false,
+        "model_age_days": 0.0,
+        "max_age_days": 30,
+        "too_old": false,
+        "quality_gate": "passed",
+        "metrics": {
+          "f1": 0.49201277955271566
+        },
+        "degradation_evidence": "not checked here: call check_prediction_drift for input drift; live accuracy needs true labels, which the system does not have"
+      },
+      "error": null,
+      "duration_ms": 62,
+      "request_id": "06032f67539d"
     }
   ],
   "pending_action_id": null

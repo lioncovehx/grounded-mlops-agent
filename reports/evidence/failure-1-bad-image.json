@@ -1,1 +1,161 @@
-{"request_id":"1ac57c7f7235","answer":"## Known facts\n- **Deployment `wine-api`** (`list_workloads`, `get_deployed_version`): desired 2, ready 2, available 2; model version **4**; desired image tag **`wine-api:0.2.0`**. `get_deployed_version` reports `rollout_complete: true`.\n- **3 Pods** exist (all 0 restarts):\n  - `wine-api-66dc547b48-pndtn` — Running, ready, image **`docker.io/library/wine-api:0.1.0`**.\n  - `wine-api-66dc547b48-sf4xq` — Running, ready, image **`docker.io/library/wine-api:0.1.0`**.\n  - `wine-api-646bf5746f-v68lv` — **Pending, not ready**, waiting reason **`ErrImagePull`**, image **`wine-api:0.2.0`**.\n- **Service `wine-api`** (`inspect_services`): routes port 80→8000 to **3 matching Pods but only 2 ready_pods**.\n- The failing replica's warning events (`find_unhealthy_pods`) show the pull failure in full:\n  > Failed to pull image \"wine-api:0.2.0\": failed to pull and unpack image \"docker.io/library/wine-api:0.2.0\": **failed to resolve reference ... pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization fai...**\n  Followed by `ImagePullBackOff`.\n\n## Uncertainties\n- `get_deployed_version` says `rollout_complete: true` and counts ready/available as 2, yet a replica is still **Pending** and cannot start. The tool's summary appears to reflect the Deployment spec (desired image 0.2.0) rather than actual pod readiness — so whether the rollout truly finished is unclear until the pending pod starts.\n- I could not read logs of the failing pod: it never ran a container (stuck at `ErrImagePull`/`ImagePullBackOff`), so there is no application log to inspect. The ready pods are healthy (0 restarts), so they need no log check.\n\n## Recommended actions\nDiagnosis: **the deployment is partially degraded, not fully broken.** Two replicas on `wine-api:0.1.0` are Running and Ready and the Service is still serving traffic through them — so the API is up but at reduced capacity (2 of 3 replicas). The recent change bumped the Deployment's desired image to **`wine-api:0.2.0`**, but that tag is not pullable from the registry (\"repository does not exist or may require authorization\"), so the new replica can't start and sits in `Pending`/`ImagePullBackOff`.\n\nLikely cause: the change updated the Deployment spec to `0.2.0` without building/pushing that image tag (or it's private/unauthorized).\n\nSuggested next steps (no action taken yet — confirm before doing any):\n1. **Verify whether `wine-api:0.2.0` exists in the registry** and is authorized for this cluster. If it was never pushed, push/build it; if it's unauthorized, fix the registry credentials/namespace.\n2. Once pullable, the pending replica will start and restore full 3-replica capacity.\n3. If you want to keep serving on the known-good build, **revert the Deployment image back to `wine-api:0.1.0`** so all replicas converge (this would trigger a rollout — confirm first).\n4. Re-check with `find_unhealthy_pods` / `get_deployed_version` after the fix to confirm the pending pod becomes Ready and ready_pods = 3.\n\nNote: this is an image/registry problem, not a model-quality or data issue, so MLflow/DVC/retraining checks are not needed for this incident.","evidence":[{"tool":"list_workloads","status":"ok","data":{"namespace":"mlops-app","deployments":[{"name":"wine-api","desired":2,"ready":2,"available":2,"images":["wine-api:0.2.0"],"model_version":"4"}],"pods":[{"name":"wine-api-646bf5746f-v68lv","phase":"Pending","ready":false,"restarts":0,"containers":[{"name":"wine-api","ready":false,"restart_count":0,"waiting_reason":"ErrImagePull","last_termination_reason":null,"image":"wine-api:0.2.0"}]},{"name":"wine-api-66dc547b48-pndtn","phase":"Running","ready":true,"restarts":0,"containers":[{"name":"wine-api","ready":true,"restart_count":0,"waiting_reason":null,"last_termination_reason":null,"image":"docker.io/library/wine-api:0.1.0"}]},{"name":"wine-api-66dc547b48-sf4xq","phase":"Running","ready":true,"restarts":0,"containers":[{"name":"wine-api","ready":true,"restart_count":0,"waiting_reason":null,"last_termination_reason":null,"image":"docker.io/library/wine-api:0.1.0"}]}]},"error":null,"duration_ms":16,"request_id":"1ac57c7f7235"},{"tool":"find_unhealthy_pods","status":"ok","data":{"namespace":"mlops-app","pods_checked":3,"unhealthy":[{"name":"wine-api-646bf5746f-v68lv","phase":"Pending","ready":false,"restarts":0,"containers":[{"name":"wine-api","ready":false,"restart_count":0,"waiting_reason":"ErrImagePull","last_termination_reason":null,"image":"wine-api:0.2.0"}]}],"warning_events":[{"object":"Pod/wine-api-646bf5746f-v68lv","reason":"Failed","message":"Failed to pull image \"wine-api:0.2.0\": failed to pull and unpack image \"docker.io/library/wine-api:0.2.0\": failed to resolve reference \"docker.io/library/wine-api:0.2.0\": pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization fai","count":1,"last_seen":"2026-11-15 16:38:06+00:00"},{"object":"Pod/wine-api-646bf5746f-v68lv","reason":"Failed","message":"Error: ErrImagePull","count":1,"last_seen":"2026-11-15 16:38:06+00:00"},{"object":"Pod/wine-api-646bf5746f-v68lv","reason":"Failed","message":"Error: ImagePullBackOff","count":1,"last_seen":"2026-11-15 16:38:07+00:00"}]},"error":null,"duration_ms":9,"request_id":"1ac57c7f7235"},{"tool":"inspect_services","status":"ok","data":{"namespace":"mlops-app","services":[{"name":"wine-api","type":"ClusterIP","selector":{"app":"wine-api"},"ports":[{"port":80,"target_port":"8000"}],"matching_pods":3,"ready_pods":2}]},"error":null,"duration_ms":10,"request_id":"1ac57c7f7235"},{"tool":"get_deployed_version","status":"ok","data":{"name":"wine-api","desired":2,"ready":2,"available":2,"images":["wine-api:0.2.0"],"model_version":"4","rollout_complete":true},"error":null,"duration_ms":7,"request_id":"1ac57c7f7235"}],"pending_action_id":null}
+{
+  "request_id": "9114c05074b4",
+  "answer": "## Known facts\n- **Rolling update is blocked.** `get_deployed_version` (deployment `wine-quality-api`) shows a rollout in progress that is **not complete**: `updated: 1`, `unavailable: 1`, `rollout_complete: false`. It is targeting image `wine-quality-api:model-v99` (model_version 6).\n- **One replica cannot start.** `find_unhealthy_pods` and `list_workloads` both show pod `wine-quality-api-587dc99558-4ntn9` in phase `Pending`, not ready, with container waiting reason **`ImagePullBackOff`**.\n- **Root cause of the pull failure.** The warning events for that pod say: failed to pull and unpack `docker.io/library/wine-quality-api:model-v99` — *\"repository does not exist or may require authorization\"* (errors `Failed` / `ErrImagePull`). The new image tag is missing from the registry (or needs auth).\n- **The other replicas are still serving the old model.** Pods `wine-quality-api-6d59dcc84d-7bgds` and `-bm67n` are Running/ready on the previous image `docker.io/library/wine-quality-api:model-v6`, so predictions are still being served — but only from 1 of the 2 desired replicas, so capacity is effectively halved.\n- **Drift check could not run.** `check_prediction_drift` returned a 400 because it tried to read logs from the stuck pod (`...waiting to start: trying and failing to pull image`). That failure is a downstream effect of the image-pull problem, not evidence of input drift.\n\n## Uncertainties\n- Whether `model-v99` simply doesn't exist in the registry versus requires different credentials — the message covers both cases; I can't tell which without registry access.\n- Whether the new model (v6 / `model-v99`) would have been production-ready at all: its quality gate result and the dataset version it was trained on are unknown until the rollout succeeds and a run is confirmed.\n- No data drift or prediction-quality signal, because live inputs can't be sampled while a replica is down.\n\n## Recommended actions\n1. **Confirm the image exists in the registry** (correct tag `model-v99` and pull access). If it's missing, push/build it; if it needs auth, fix the registry credentials/secret.\n2. **Once the image resolves, the rollout will proceed automatically.** Do not force a restart yet — the two healthy replicas are still serving model v6.\n3. **If you want to abandon this change now**, I can roll the deployment back (restart `wine-quality-api`) so it returns fully to the last good image — confirm before I do, since that changes the system.\n4. **After a clean rollout**, re-run `check_prediction_drift` and verify both replicas are ready; then check the new model's quality gate and dataset version before declaring it production-ready.\n\nNote: these tool calls did not succeed, so their data is missing from this answer: check_prediction_drift (error).",
+  "evidence": [
+    {
+      "tool": "list_workloads",
+      "status": "ok",
+      "data": {
+        "namespace": "wine-quality",
+        "deployments": [
+          {
+            "name": "wine-quality-api",
+            "desired": 2,
+            "ready": 2,
+            "available": 2,
+            "updated": 1,
+            "unavailable": 1,
+            "images": [
+              "wine-quality-api:model-v99"
+            ],
+            "model_version": "6"
+          }
+        ],
+        "pods": [
+          {
+            "name": "wine-quality-api-587dc99558-4ntn9",
+            "phase": "Pending",
+            "ready": false,
+            "restarts": 0,
+            "containers": [
+              {
+                "name": "api",
+                "ready": false,
+                "restart_count": 0,
+                "waiting_reason": "ImagePullBackOff",
+                "last_termination_reason": null,
+                "image": "wine-quality-api:model-v99"
+              }
+            ]
+          },
+          {
+            "name": "wine-quality-api-6d59dcc84d-7bgds",
+            "phase": "Running",
+            "ready": true,
+            "restarts": 0,
+            "containers": [
+              {
+                "name": "api",
+                "ready": true,
+                "restart_count": 0,
+                "waiting_reason": null,
+                "last_termination_reason": null,
+                "image": "docker.io/library/wine-quality-api:model-v6"
+              }
+            ]
+          },
+          {
+            "name": "wine-quality-api-6d59dcc84d-bm67n",
+            "phase": "Running",
+            "ready": true,
+            "restarts": 0,
+            "containers": [
+              {
+                "name": "api",
+                "ready": true,
+                "restart_count": 0,
+                "waiting_reason": null,
+                "last_termination_reason": null,
+                "image": "docker.io/library/wine-quality-api:model-v6"
+              }
+            ]
+          }
+        ]
+      },
+      "error": null,
+      "duration_ms": 11,
+      "request_id": "9114c05074b4"
+    },
+    {
+      "tool": "find_unhealthy_pods",
+      "status": "ok",
+      "data": {
+        "namespace": "wine-quality",
+        "pods_checked": 3,
+        "unhealthy": [
+          {
+            "name": "wine-quality-api-587dc99558-4ntn9",
+            "phase": "Pending",
+            "ready": false,
+            "restarts": 0,
+            "containers": [
+              {
+                "name": "api",
+                "ready": false,
+                "restart_count": 0,
+                "waiting_reason": "ImagePullBackOff",
+                "last_termination_reason": null,
+                "image": "wine-quality-api:model-v99"
+              }
+            ]
+          }
+        ],
+        "warning_events": [
+          {
+            "object": "Pod/wine-quality-api-587dc99558-4ntn9",
+            "reason": "Failed",
+            "message": "Error: ImagePullBackOff",
+            "count": 1,
+            "last_seen": "2026-11-15 17:47:53+00:00"
+          },
+          {
+            "object": "Pod/wine-quality-api-587dc99558-4ntn9",
+            "reason": "Failed",
+            "message": "Failed to pull image \"wine-quality-api:model-v99\": failed to pull and unpack image \"docker.io/library/wine-quality-api:model-v99\": failed to resolve reference \"docker.io/library/wine-quality-api:model-v99\": pull access denied, repository does not exist or may require authorization: server message: i",
+            "count": 2,
+            "last_seen": "2026-11-15 17:48:05+00:00"
+          },
+          {
+            "object": "Pod/wine-quality-api-587dc99558-4ntn9",
+            "reason": "Failed",
+            "message": "Error: ErrImagePull",
+            "count": 2,
+            "last_seen": "2026-11-15 17:48:05+00:00"
+          }
+        ]
+      },
+      "error": null,
+      "duration_ms": 7,
+      "request_id": "9114c05074b4"
+    },
+    {
+      "tool": "check_prediction_drift",
+      "status": "error",
+      "data": null,
+      "error": "BadRequestException: (400)\nReason: Bad Request\nHTTP response headers: HTTPHeaderDict({'Audit-Id': '5224a9c0-d79b-47e7-8e7e-348fa1163294', 'Cache-Control': 'no-cache, private', 'Content-Type': 'application/json', 'Date': 'Sun, 15 Nov 2026 17:48:11 GMT', 'Content-Length': '231'})\nHTTP response body: {\"kind\":\"Status\",\"apiVersion\":\"v1\",\"metadata\":{},\"status\":\"Failure\",\"message\":\"container \\\"api\\\" in pod \\\"wine-quality-api-587dc99558-4ntn9\\\" is waiting to start: trying and failing to pull image\",\"rea",
+      "duration_ms": 9,
+      "request_id": "9114c05074b4"
+    },
+    {
+      "tool": "get_deployed_version",
+      "status": "ok",
+      "data": {
+        "name": "wine-quality-api",
+        "desired": 2,
+        "ready": 2,
+        "available": 2,
+        "updated": 1,
+        "unavailable": 1,
+        "images": [
+          "wine-quality-api:model-v99"
+        ],
+        "model_version": "6",
+        "rollout_complete": false
+      },
+      "error": null,
+      "duration_ms": 4,
+      "request_id": "9114c05074b4"
+    }
+  ],
+  "pending_action_id": null
+}

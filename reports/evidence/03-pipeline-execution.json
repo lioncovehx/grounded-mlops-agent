@@ -1,7 +1,29 @@
 {
-  "request_id": "a2cfc943ffaa",
-  "answer": "I triggered the training pipeline, but the action is **waiting for your confirmation** outside this chat (pending action ID `d6dce7b2c000`). The system does not run it until you confirm.\n\nOnce you confirm, I can then report whether execution succeeded by checking the DAG run status.\n\nTo proceed, please confirm that you want me to trigger the `training_pipeline` run.",
+  "request_id": "2639e262510a",
+  "answer": "I've prepared the trigger for the training pipeline, but it's **waiting for your confirmation** before it will run. This is a system-changing action (starting a new DAG run), so it needs explicit approval outside this chat.\n\n**Pending action:** Trigger the `training_pipeline` DAG\n**Pending action ID:** `3b89a63472e7`\n\nPlease confirm that you want me to proceed with triggering the training pipeline, and I'll then monitor its execution and report whether it succeeded.",
   "evidence": [
+    {
+      "tool": "list_dags",
+      "status": "ok",
+      "data": {
+        "dags": [
+          {
+            "dag_id": "training_pipeline",
+            "is_paused": false,
+            "description": null,
+            "tags": [
+              "training"
+            ]
+          }
+        ],
+        "triggerable_by_agent": [
+          "training_pipeline"
+        ]
+      },
+      "error": null,
+      "duration_ms": 33,
+      "request_id": "2639e262510a"
+    },
     {
       "tool": "trigger_dag",
       "status": "confirmation_required",
@@ -10,12 +32,12 @@
         "arguments": {
           "dag_id": "training_pipeline"
         },
-        "pending_action_id": "d6dce7b2c000"
+        "pending_action_id": "3b89a63472e7"
       },
       "error": "Not run. The user must confirm it outside this chat; tell them it is waiting for confirmation.",
       "duration_ms": 0,
-      "request_id": "a2cfc943ffaa"
+      "request_id": "2639e262510a"
     }
   ],
-  "pending_action_id": "d6dce7b2c000"
+  "pending_action_id": "3b89a63472e7"
 }

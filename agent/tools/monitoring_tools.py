@@ -88,18 +88,27 @@ def check_prediction_drift(args: DriftArgs) -> dict:
     pods = core.list_namespaced_pod(
         ns, label_selector=selector, _request_timeout=kubernetes_tools.REQUEST_TIMEOUT
     ).items
-    records = []
+    from kubernetes.client.exceptions import ApiException
+
+    records, read, skipped = [], [], {}
     for pod in pods:
-        log_text = core.read_namespaced_pod_log(
-            pod.metadata.name,
-            ns,
-            tail_lines=args.max_log_lines,
-            _request_timeout=kubernetes_tools.REQUEST_TIMEOUT,
-        )
+        try:
+            log_text = core.read_namespaced_pod_log(
+                pod.metadata.name,
+                ns,
+                tail_lines=args.max_log_lines,
+                _request_timeout=kubernetes_tools.REQUEST_TIMEOUT,
+            )
+        except ApiException as exc:
+            # A Pod that never started has no logs; skip it rather than fail the whole check.
+            skipped[pod.metadata.name] = f"logs unavailable (HTTP {exc.status})"
+            continue
+        read.append(pod.metadata.name)
         records.extend(prediction_records(log_text))
 
     result = {
-        "pods_read": [p.metadata.name for p in pods],
+        "pods_read": read,
+        "pods_skipped": skipped,
         "predictions_found": len(records),
         "window": "since each Pod started, up to max_log_lines per Pod",
         "model_versions_seen": sorted({str(r.get("model_version")) for r in records}),

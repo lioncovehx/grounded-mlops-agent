@@ -55,12 +55,12 @@ def services(monkeypatch):
     monkeypatch.setattr(airflow_tools, "api", af)
 
     deployment = SimpleNamespace(
-        metadata=SimpleNamespace(name="wine-api"),
+        metadata=SimpleNamespace(name="test-api"),
         spec=SimpleNamespace(
             replicas=2,
             template=SimpleNamespace(
                 metadata=SimpleNamespace(labels={"mlops/model-version": "4"}),
-                spec=SimpleNamespace(containers=[SimpleNamespace(image="wine-api:0.1.0")]),
+                spec=SimpleNamespace(containers=[SimpleNamespace(image="test-api:v1")]),
             ),
         ),
         status=SimpleNamespace(
@@ -136,14 +136,14 @@ def test_llm_outage_gives_a_clear_answer():
 
 def test_restart_waits_for_confirmation_through_the_api_and_runs_once(services, monkeypatch):
     llm = FakeLLM(
-        calls(tool_call("restart_deployment", '{"name": "wine-api"}')), answer("Please confirm.")
+        calls(tool_call("restart_deployment", '{"name": "test-api"}')), answer("Please confirm.")
     )
     monkeypatch.setattr(
         main, "run_agent", lambda msg, rid: orchestrator.run_agent(msg, rid, llm=llm)
     )
     api = TestClient(main.app)
 
-    chat = api.post("/chat", json={"message": "Restart the wine-api deployment"}).json()
+    chat = api.post("/chat", json={"message": "Restart the test-api deployment"}).json()
     assert chat["evidence"][0]["status"] == "confirmation_required"
     action_id = chat["pending_action_id"]
     services.apps.patch_namespaced_deployment.assert_not_called()

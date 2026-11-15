@@ -4,20 +4,22 @@ Conversational AI agent for MLOps: traces dataset lineage (DVC), compares experi
 
 Ask a question in plain language. The agent calls tools against the real systems, then answers from what they returned, with the raw tool results attached as `evidence`. Anything that changes the system waits for a person to confirm it, through an endpoint the LLM cannot reach.
 
+The agent isn't tied to one project. A config file, [`mlops-agent.yaml`](mlops-agent.yaml), says which experiment, model, DAGs and namespace to manage. This repo also contains a complete demo project for it to manage: a wine quality classifier with versioned data, a training pipeline, a model registry and a Kubernetes deployment.
+
 ```text
 > Find the best recent model, identify the dataset version used to train it,
   check the deployment status, and explain whether retraining is necessary.
 
 ## Known facts
 - Best run dd037273… has F1 0.4951 and passed the quality gate (get_best_run).
-- It was trained on data-v2, md5 3e3353d2…, verified against the DVC pointer (get_dataset_for_run).
-- wine-api runs model version 4 with 2/2 replicas ready; rollout complete (get_deployed_version).
-- The latest pipeline run failed at validate_dataset (get_dag_run_status).
-- The champion was trained on the current data and is 0 days old (get_retraining_signals).
+- It was trained on data-v2, hash verified against the DVC pointer (get_dataset_for_run).
+- wine-quality-api runs model-v6, 2/2 replicas ready, rollout complete (get_deployed_version).
+- No newer data, model 0 days old, gate passed (get_retraining_signals).
+- No input drift; largest shift −0.21 std (check_prediction_drift).
 ## Uncertainties
-- No production metrics are available, so degradation can't be assessed.
+- Live accuracy is unknown without true labels.
 ## Recommended actions
-- Retraining isn't indicated by the available signals. Investigate the failed pipeline run.
+- No retraining warranted. The best-scoring run isn't the deployed one: review promotion.
 ```
 
 The full exchange, with every tool result, is in [`reports/evidence/05-multi-tool.json`](reports/evidence/05-multi-tool.json).
@@ -30,28 +32,30 @@ flowchart LR
     U -- "POST /actions/{id}/confirm" --> A
     A <--> L["LLM<br/>any OpenAI-compatible endpoint"]
     A --> T["execute_tool<br/>validation, confirmation, timeout, logs"]
+    C["mlops-agent.yaml"] -.-> T
     T --> D["DVC + Git"]
     T --> M["MLflow<br/>runs and registry"]
     T --> F["Airflow 3<br/>REST API"]
-    T --> K["Kubernetes<br/>restricted ServiceAccount"]
+    T --> K["Kubernetes<br/>mlops-agent ServiceAccount"]
     F -- "runs" --> P["training/train.py"]
     P --> M
-    K --> I["wine-api<br/>inference service, 2 replicas"]
+    K --> I["wine-quality-api<br/>2 replicas"]
 ```
 
 | Component | Location |
 |---|---|
-| Training stages: validate, preprocess, train, evaluate, gate | `training/train.py` |
-| Airflow pipeline | `dags/training_pipeline.py`, `infra/airflow/Dockerfile` |
-| Inference service | `api/main.py`, `Dockerfile` |
-| Kubernetes manifests and RBAC | `kubernetes/` |
-| Tools: 25, across DVC, MLflow, Airflow, Kubernetes and drift monitoring | `agent/tools/` |
+| Project config | `mlops-agent.yaml`, loaded by `agent/config.py` |
+| Tools: 25 across DVC, MLflow, Airflow, Kubernetes and drift monitoring | `agent/tools/` |
 | Tool runner: validation, confirmation, timeouts, structured logs | `agent/registry.py` |
 | Agent loop and system prompt | `agent/orchestrator.py` |
 | LLM adapter | `agent/llm.py` |
 | Chat API | `agent/main.py` |
+| Demo project: training stages | `training/train.py` |
+| Demo project: Airflow pipeline | `dags/training_pipeline.py`, `infra/airflow/Dockerfile` |
+| Demo project: inference service | `api/main.py`, `Dockerfile` |
+| Demo project: Kubernetes manifests and RBAC | `kubernetes/` (kustomize) |
 
-See [`architecture.md`](architecture.md) for the request flow, data lineage and permission layers.
+See [`architecture.md`](architecture.md) for the request flow, data lineage, drift monitoring and permission layers.
 
 ## Installation
 
@@ -67,25 +71,49 @@ pip install -e ".[dev]"
 
 ## Configuration
 
+Two files: **`mlops-agent.yaml`** says *what* the agent manages, and **`.env`** holds *how to reach it*: URLs and credentials.
+
 ```bash
 cp .env.example .env
 ```
 
-| Variable | Purpose |
+| `.env` variable | Purpose |
 |---|---|
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | The LLM endpoint. See [Using your own LLM](#using-your-own-llm) |
 | `MLFLOW_TRACKING_URI` | MLflow server, `http://localhost:5000` |
 | `AIRFLOW_BASE_URL`, `AIRFLOW_USERNAME`, `AIRFLOW_PASSWORD` | Airflow API. The local stack uses `airflow` / `airflow` |
 | `KUBECONFIG` | **Full path** to the agent's restricted kubeconfig. Quote it if the path has spaces |
-| `AGENT_ALLOWED_NAMESPACE` | The only namespace the Kubernetes tools may touch |
-| `AGENT_ALLOWED_DAGS` | Comma-separated DAGs the agent may trigger |
-| `QUALITY_GATE_F1` | Minimum F1 for a model to be registered as `candidate` |
+| `MLOPS_AGENT_CONFIG` | Optional path to a project config; default `mlops-agent.yaml` in the repo root |
+| `QUALITY_GATE_F1` | Demo training: minimum F1 for a model to become `candidate` |
 | `AIRFLOW_UID` | Your user ID (`id -u`), so files the pipeline writes stay yours |
 | `AIRFLOW__API_AUTH__JWT_SECRET`, `FERNET_KEY` | Random secrets for Airflow. Commands to generate them are in `.env.example` |
 
-Optional: `TOOL_TIMEOUT_S` (default 30), `LLM_TIMEOUT_S` (300) and `MODEL_MAX_AGE_DAYS` (30).
+Optional: `TOOL_TIMEOUT_S` (default 30) and `LLM_TIMEOUT_S` (300).
 
-## Launching the services
+## Using the agent with your own project
+
+Write a `mlops-agent.yaml` for your project (or point `MLOPS_AGENT_CONFIG` at one). Every key is optional. Without a value, tools fall back to generic defaults, discover what they can, or ask for it as an argument. Unknown keys are rejected, so typos fail loudly.
+
+| Section | Keys | Used for |
+|---|---|---|
+| `dvc` | `repo_dir`, `version_tag_pattern`, `default_dataset` | Datasets are discovered from tracked `.dvc` files; versions are Git tags matching the pattern |
+| `mlflow` | `experiment`, `registered_model`, `primary_metric`, `aliases`, `tags`, `model_max_age_days`, `feature_stats_artifact` | Defaults for run, registry and retraining tools. Metrics are discovered from runs |
+| `airflow` | `default_dag`, `allowed_dags` | The only DAGs the agent may trigger |
+| `kubernetes` | `namespace`, `default_deployment`, `pod_selector`, `model_version_label` | The only namespace the agent may touch |
+| `monitoring` | `prediction_event`, `drift_threshold_std`, `min_predictions` | Drift check |
+
+Listing runs, DAGs, Pods and services works on any project straight away. The lineage, retraining and drift features need your project to follow this **integration contract**. Anything missing is reported as "not available", never guessed:
+
+1. **Provenance tags on each MLflow run** (names configurable in `mlflow.tags`): data hash, data version tag, data commit, data path, code commit, quality gate result.
+2. **A `source_run` tag on each registered model version**, and an alias for the deployed version (`champion` by default).
+3. **A `feature_stats.json` artifact on each training run:** `{"features": {"<name>": {"mean": ..., "std": ...}}, "label_positive_rate": ...}`.
+4. **One JSON log line per prediction** from the inference service: `{"event": "prediction", "model_version": ..., "features": {...}, "prediction": ...}`.
+5. **A model version label** on the Deployment's Pod template (`mlops/model-version` by default).
+6. **A restricted ServiceAccount** like `kubernetes/rbac.yaml`: read access plus `patch` on Deployments, in one namespace.
+
+`training/train.py`, `api/main.py` and `kubernetes/` in this repo are a working example of every point.
+
+## Launching the demo project
 
 **1. Data.** The DVC remote is local to the author's machine, so rebuild the data from the UCI files (see [Data](#data)):
 
@@ -94,7 +122,7 @@ python data/build_dataset.py v2 --source <folder with the UCI CSV files> --out d
 dvc repro
 ```
 
-**2. MLflow and Airflow,** in one Compose stack. The first build takes several minutes.
+**2. MLflow and Airflow,** in one Compose stack (project `grounded-mlops`). The first build takes several minutes.
 
 ```bash
 docker compose build
@@ -104,12 +132,11 @@ docker compose up -d
 
 MLflow is at http://localhost:5000, and Airflow at http://localhost:8080. New DAGs start paused, so unpause `training_pipeline` in the UI or through the API, then trigger it.
 
-**3. Kubernetes and the inference service.**
+**3. Kubernetes and the inference service.** Promote the gate-approved model, build its image, and deploy:
 
 ```bash
 export MLFLOW_TRACKING_URI=http://localhost:5000
-# Fetch the candidate model and record it as champion
-python - <<'EOF'
+V=$(python - <<'EOF'
 import mlflow
 from mlflow import MlflowClient
 c = MlflowClient()
@@ -118,23 +145,23 @@ mlflow.artifacts.download_artifacts(run_id=v.tags["source_run"], artifact_path="
 c.set_registered_model_alias("wine-quality", "champion", v.version)
 print(v.version)
 EOF
-
-docker build --build-arg MODEL_VERSION=<version> -t wine-api:0.1.0 .
+)
+docker build --build-arg MODEL_VERSION=$V -t wine-quality-api:model-v$V .
 minikube start -p mlops --driver=docker --container-runtime=containerd
-minikube -p mlops image load wine-api:0.1.0
-kubectl apply -f kubernetes/namespace.yaml && kubectl apply -f kubernetes/
-kubectl -n mlops-app rollout status deployment/wine-api
+minikube -p mlops image load wine-quality-api:model-v$V
+kubectl apply -k kubernetes/
+kubectl -n wine-quality rollout status deployment/wine-quality-api
 ```
 
-Set the `model-version` label in `kubernetes/deployment.yaml` to the same version.
+The image tag and the `mlops/model-version` label are both set in `kubernetes/kustomization.yaml`. Change them together when you ship a new version.
 
 **4. The agent's restricted credentials.** The minikube kubeconfig is cluster admin, so the agent gets its own:
 
 ```bash
 kubectl config view --raw --minify --flatten > kubeconfig.agent && chmod 600 kubeconfig.agent
-TOKEN=$(kubectl -n mlops-app create token agent --duration=24h)
-kubectl --kubeconfig kubeconfig.agent config set-credentials agent --token="$TOKEN"
-kubectl --kubeconfig kubeconfig.agent config set-context --current --user=agent --namespace=mlops-app
+TOKEN=$(kubectl -n wine-quality create token mlops-agent --duration=24h)
+kubectl --kubeconfig kubeconfig.agent config set-credentials mlops-agent --token="$TOKEN"
+kubectl --kubeconfig kubeconfig.agent config set-context --current --user=mlops-agent --namespace=wine-quality
 kubectl --kubeconfig kubeconfig.agent config unset users.mlops
 ```
 
@@ -161,7 +188,7 @@ Interactive API docs are at http://localhost:8001/docs.
 
 ```bash
 curl -s localhost:8001/chat -H 'Content-Type: application/json' \
-  -d '{"message": "Why did the latest training_pipeline run fail?"}' | jq
+  -d '{"message": "Why did the latest training run fail?"}' | jq
 ```
 
 Every response has `answer`, `evidence` (one envelope per tool call: `tool`, `status`, `data`, `error`, `duration_ms`, `request_id`), `request_id`, and `pending_action_id`.
@@ -177,12 +204,12 @@ Pending actions expire after 5 minutes.
 
 ## Monitoring for drift
 
-The inference service writes one JSON line per prediction to its logs. The agent's `check_prediction_drift` tool reads them from the Pods and compares the inputs with the exact data the deployed model was trained on. It finds that data through the champion's provenance tags and reads it from the DVC cache. It reports each feature's mean shift in training standard deviations, flags shifts over 0.5, and needs at least 30 predictions before giving a verdict.
+`check_prediction_drift` reads the prediction log lines from the inference Pods, and compares the inputs with the deployed model's `feature_stats.json`, found through the `champion` alias. It reports each feature's mean shift in training standard deviations, flags shifts over 0.5, and needs at least 30 predictions before giving a verdict. Pods without readable logs, such as one stuck pulling an image, are skipped and listed.
 
 To try it, port-forward the Service, send traffic, then ask the agent:
 
 ```bash
-kubectl -n mlops-app port-forward svc/wine-api 8000:80 &
+kubectl -n wine-quality port-forward svc/wine-quality-api 8000:80 &
 python scripts/send_traffic.py normal --n 60    # real rows: no drift
 python scripts/send_traffic.py skewed --n 60    # residual sugar tripled: drift
 ```
@@ -206,7 +233,7 @@ pytest -m "not integration"
 ruff check . && ruff format --check .
 ```
 
-The tests replace the LLM with scripted replies and mock each service at its client, so they need no running services. GitHub Actions runs lint and tests on every pull request (`.github/workflows/ci.yml`).
+The tests replace the LLM with scripted replies, mock each service at its client, and use a test config (`tests/agent-test.yaml`) whose names differ from the demo project, so they need no running services. GitHub Actions runs lint and tests on every pull request (`.github/workflows/ci.yml`).
 
 ## Data
 
@@ -237,5 +264,6 @@ The model predicts whether a wine is good (quality 7 or above), with duplicates 
 - **One train/test split** and a small dataset. The F1 scores are indicative, not tuned.
 - **Pending actions are in memory.** They're lost on restart and work only with a single process.
 - **Short-lived Kubernetes token.** It has to be recreated when it expires.
-- **No live accuracy.** Input drift is measured from prediction logs, but accuracy in production needs true quality labels, which the system doesn't receive. Prediction logs also reset when Pods restart.
-- **LLM judgement varies.** Facts come from tools, and code adds a note when a tool fails, but which tools the model chooses, and its inferences, can still vary between runs.
+- **No live accuracy.** Input drift is measured from prediction logs, but accuracy in production needs true labels, which the system doesn't receive. Prediction logs also reset when Pods restart.
+- **No promotion tool.** The agent reports `candidate` and `champion` but can't move them; promotion and deployment are manual (step 3).
+- **LLM judgement varies.** Facts come from tools, and code adds a note when a tool fails, but which tools the model chooses, and its inferences, can still be wrong. See the report's "Agent errors observed".

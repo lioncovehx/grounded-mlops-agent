@@ -7,10 +7,14 @@ dd037273c28649d6a6b917bdfd2ebc12   rf      300   0.495  data-v2  passed  b00cd5e
 80655548427547dc83498398d8af75ee   rf      100   0.492  data-v2  passed  b00cd5e
 90a2a26047954e8c88f5bb3731fce040   rf      100   0.492  data-v2  failed  b00cd5e
 4113ba5e5b8d4e8abae243983bf7b480   rf      100   0.492  data-v2  passed  941754e
+c52f21d3155f488ab33b38dc860ca0ea   rf      100   0.492  data-v2  passed  1837884
+8802379c1b7b4154ba49a52ff253cd47   rf      100   0.492  data-v2  passed  d5d1f9d
 
-registered model wine-quality, aliases: {'candidate': '5', 'champion': '4'}
-  version 1: source_run=8da2c720fcb24105a074a300bf94a90b
-  version 2: source_run=9e7b5702d75e4e979ef79556ea5c7902
-  version 3: source_run=dd037273c28649d6a6b917bdfd2ebc12
-  version 4: source_run=80655548427547dc83498398d8af75ee
-  version 5: source_run=4113ba5e5b8d4e8abae243983bf7b480
+registered model wine-quality, aliases: {'candidate': '7', 'champion': '6'}
+  version 1: source_run=8da2c720fcb24105a074a300bf94a90b feature_stats=False
+  version 2: source_run=9e7b5702d75e4e979ef79556ea5c7902 feature_stats=False
+  version 3: source_run=dd037273c28649d6a6b917bdfd2ebc12 feature_stats=False
+  version 4: source_run=80655548427547dc83498398d8af75ee feature_stats=False
+  version 5: source_run=4113ba5e5b8d4e8abae243983bf7b480 feature_stats=False
+  version 6: source_run=c52f21d3155f488ab33b38dc860ca0ea feature_stats=True
+  version 7: source_run=8802379c1b7b4154ba49a52ff253cd47 feature_stats=True
