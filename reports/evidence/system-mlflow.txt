@@ -1,0 +1,16 @@
+run_id                             model   trees f1     data.tag gate    git.commit
+35eafadd2a3b4c9d8c5aaa5d8b110cc9   logreg  -     0.346  data-v1  failed  b00cd5e
+8da2c720fcb24105a074a300bf94a90b   rf      100   0.473  data-v1  passed  b00cd5e
+cd97c886fc9b40adb71ae86b6d2feab0   logreg  -     0.410  data-v2  failed  b00cd5e
+9e7b5702d75e4e979ef79556ea5c7902   rf      100   0.492  data-v2  passed  b00cd5e
+dd037273c28649d6a6b917bdfd2ebc12   rf      300   0.495  data-v2  passed  b00cd5e
+80655548427547dc83498398d8af75ee   rf      100   0.492  data-v2  passed  b00cd5e
+90a2a26047954e8c88f5bb3731fce040   rf      100   0.492  data-v2  failed  b00cd5e
+4113ba5e5b8d4e8abae243983bf7b480   rf      100   0.492  data-v2  passed  941754e
+
+registered model wine-quality, aliases: {'candidate': '5', 'champion': '4'}
+  version 1: source_run=8da2c720fcb24105a074a300bf94a90b
+  version 2: source_run=9e7b5702d75e4e979ef79556ea5c7902
+  version 3: source_run=dd037273c28649d6a6b917bdfd2ebc12
+  version 4: source_run=80655548427547dc83498398d8af75ee
+  version 5: source_run=4113ba5e5b8d4e8abae243983bf7b480

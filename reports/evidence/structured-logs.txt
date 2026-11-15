@@ -1,0 +1,12 @@
+{"event": "tool_call", "tool": "get_dataset_for_run", "status": "ok", "duration_ms": 15, "request_id": "a281fe722583"}
+{"event": "tool_call", "tool": "get_reproduction_steps", "status": "ok", "duration_ms": 1, "request_id": "a281fe722583"}
+{"event": "tool_call", "tool": "get_reproduction_steps", "status": "ok", "duration_ms": 3, "request_id": "a281fe722583"}
+{"event": "tool_call", "tool": "list_runs", "status": "ok", "duration_ms": 131, "request_id": "2c4ac9889ae6"}
+{"event": "tool_call", "tool": "list_workloads", "status": "ok", "duration_ms": 333, "request_id": "916a29797c4d"}
+{"event": "tool_call", "tool": "inspect_services", "status": "ok", "duration_ms": 7, "request_id": "916a29797c4d"}
+{"event": "tool_call", "tool": "find_unhealthy_pods", "status": "ok", "duration_ms": 8, "request_id": "916a29797c4d"}
+{"event": "tool_call", "tool": "get_deployed_version", "status": "ok", "duration_ms": 14, "request_id": "916a29797c4d"}
+{"event": "tool_call", "tool": "trigger_dag", "status": "confirmation_required", "duration_ms": 0, "request_id": "a2cfc943ffaa"}
+{"event": "tool_call", "tool": "trigger_dag", "status": "ok", "duration_ms": 146, "request_id": "a2cfc943ffaa"}
+{"event": "tool_call", "tool": "get_dag_run_status", "status": "ok", "duration_ms": 70, "request_id": "a8abec56ea43"}
+{"event": "tool_call", "tool": "get_registry_info", "status": "ok", "duration_ms": 51, "request_id": "a8abec56ea43"}

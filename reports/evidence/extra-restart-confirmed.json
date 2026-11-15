@@ -1,0 +1,1 @@
+{"request_id":"58caea84d4f3","answer":"Confirmed restart_deployment: done.","evidence":[{"tool":"restart_deployment","status":"ok","data":{"deployment":"wine-api","namespace":"mlops-app","restarted_at":"2026-11-15T16:37:22.986541+00:00"},"error":null,"duration_ms":29,"request_id":"58caea84d4f3"}],"pending_action_id":null}
